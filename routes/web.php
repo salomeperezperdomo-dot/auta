@@ -3,6 +3,9 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\EstudianteController;
 use App\Http\Controllers\AsistenciaController;
 use App\Http\Controllers\UsuarioController;
+use App\Http\Controllers\GradoController;
+use App\Http\Controllers\HorarioController;
+use App\Http\Controllers\LogController;
 use App\Models\Estudiante;
 
 // Vista del escáner QR (solo para docentes y admin)
@@ -36,3 +39,14 @@ Route::get('/carnets', function () {
 })->name('carnets');
 
 Route::put('/api/asistencia/{id}', [AsistenciaController::class, 'update']);
+
+// API de grados
+Route::apiResource('grados', GradoController::class);
+
+// API de horarios
+Route::apiResource('horarios', HorarioController::class);
+
+// API de logs (solo lectura y creación)
+Route::get('logs', [LogController::class, 'index']);
+Route::post('logs', [LogController::class, 'store']);
+Route::get('logs/{id}', [LogController::class, 'show']);

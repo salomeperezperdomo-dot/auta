@@ -1609,7 +1609,7 @@ table.rtbl tr:last-child td {
     gap: 0.35rem;
 }
 .act-btn {
-    width: 28px;
+    width: auto;
     height: 28px;
     border-radius: 7px;
     border: none;

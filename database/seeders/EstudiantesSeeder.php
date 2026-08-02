@@ -4,6 +4,8 @@ namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
 use App\Models\Estudiante;
+use App\Models\Grado;
+use App\Models\Grupo;
 
 class EstudiantesSeeder extends Seeder
 {
@@ -18,7 +20,22 @@ class EstudiantesSeeder extends Seeder
         ];
 
         foreach ($estudiantes as $estudiante) {
-            Estudiante::create($estudiante);
+            $grado = Grado::where('nombre', $estudiante['grado'])->first();
+            if (!$grado) {
+                continue; // el grado debe existir (lo crea GradosSeeder antes que este)
+            }
+
+            // Los reparte en el primer grupo de su grado (ej: "10°1")
+            $grupo = Grupo::where('grado_id', $grado->id)->orderBy('nombre')->first();
+
+            Estudiante::updateOrCreate(
+                ['codigo' => $estudiante['codigo']],
+                [
+                    'nombre'   => $estudiante['nombre'],
+                    'grado_id' => $grado->id,
+                    'grupo_id' => $grupo?->id,
+                ]
+            );
         }
     }
 }

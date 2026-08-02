@@ -21,6 +21,7 @@ class HorarioController extends Controller
         ]);
 
         $horario = Horario::create($request->all());
+
         return response()->json($horario, 201);
     }
 

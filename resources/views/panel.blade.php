@@ -119,6 +119,15 @@
                         <span class="psb-ic"><i class="fas fa-chart-bar"></i></span>
                         Reportes
                     </button>
+                    <div class="psb-lbl">Administración</div>
+                    <button class="psb-btn" onclick="mostrarVista('grados')">
+                        <span class="psb-ic"><i class="fas fa-layer-group"></i></span>
+                        Grados
+                    </button>
+                    <button class="psb-btn" onclick="mostrarVista('horarios')">
+                        <span class="psb-ic"><i class="fas fa-clock"></i></span>
+                        Horarios
+                    </button>
                     <div class="psb-lbl">Navegación</div>
                     <button class="psb-btn" onclick="window.location.href='/escaner'">
                         <span class="psb-ic"><i class="fas fa-qrcode"></i></span>
@@ -172,6 +181,12 @@
                 } else if (vista === "reportes") {
                     document.getElementById("pTopTitle").textContent = "Reportes";
                     cargarReportesAdmin();
+                } else if (vista === "grados") {
+                    document.getElementById("pTopTitle").textContent = "Grados";
+                    cargarGradosAdmin();
+                } else if (vista === "horarios") {
+                    document.getElementById("pTopTitle").textContent = "Horarios";
+                    cargarHorariosAdmin();
                 }
             }
         }
@@ -230,38 +245,72 @@
                     <div class="p-card-hd">
                         <h6><i class="fas fa-chart-bar" style="margin-right: 0.4rem; color: var(--blue-light);"></i>Reportes de Asistencia</h6>
                     </div>
+                    <div class="p-card-bd" style="padding-top:0;padding-bottom:0.75rem;">
+                        <div style="display:flex;gap:0.75rem;flex-wrap:wrap;margin-bottom:0.75rem;align-items:center;">
+                            <input type="text" class="pinp" id="rep-doc-buscar" placeholder="🔎 Buscar por nombre..." style="flex:1;min-width:220px;" oninput="resetPagina('repDoc');renderReportesDocenteFiltrado()" />
+                            <select class="pinp" id="rep-doc-filtro-grado" style="min-width:180px;background:rgba(255,255,255,0.05)" onchange="resetPagina('repDoc');renderReportesDocenteFiltrado()">
+                                <option value="">Todos los grados</option>
+                            </select>
+                            <input type="date" class="pinp" id="rep-doc-filtro-fecha" title="Filtrar por fecha" style="min-width:160px;background:rgba(255,255,255,0.05)" onchange="resetPagina('repDoc');renderReportesDocenteFiltrado()" />
+                            <button class="act-btn" title="Limpiar filtros" onclick="limpiarFiltros('repDoc', renderReportesDocenteFiltrado)"><i class="fas fa-times"></i> Limpiar</button>
+                        </div>
+                    </div>
                     <div class="tbl-wrap">
                         <table class="rtbl">
                             <thead>
-                                <tr><th>Estudiante</th><th>Grado</th><th>Fecha</th><th>Hora</th><th>Estado</th></tr>
+                                <tr>${thOrdenable('repDoc','nombre','Estudiante','renderReportesDocenteFiltrado')}${thOrdenable('repDoc','grado','Grado','renderReportesDocenteFiltrado')}${thOrdenable('repDoc','fecha','Fecha','renderReportesDocenteFiltrado')}${thOrdenable('repDoc','hora','Hora','renderReportesDocenteFiltrado')}${thOrdenable('repDoc','estado','Estado','renderReportesDocenteFiltrado')}</tr>
                             </thead>
                             <tbody id="reportes-tbody"></tbody>
                         </table>
                     </div>
+                    <div id="repDoc-paginacion" style="padding:0 1rem;"></div>
                 </div>
             `;
             document.getElementById("contenido-dinamico").innerHTML = html;
 
             try {
                 const res = await fetch("/api/asistencia");
-                const data = await res.json();
-                const tbody = document.getElementById("reportes-tbody");
-                if (data.length === 0) {
-                    tbody.innerHTML = `<tr><td colspan="5"><div class="empty-st">No hay registros de asistencia.</div></td></tr>`;
-                    return;
-                }
-                tbody.innerHTML = data.map(a => `
-                    <tr>
-                        <td>${a.nombre}</td>
-                        <td>${a.grado}</td>
-                        <td>${a.fecha}</td>
-                        <td>${a.hora}</td>
-                        <td><span class="badge ${a.estado === 'Presente' ? 'presente' : a.estado === 'Retardo' ? 'retardo' : 'ausente'}">${a.estado}</span></td>
-                    </tr>
-                `).join('');
+                _repDocenteData = await res.json();
+                poblarFiltroGrados("rep-doc-filtro-grado", _repDocenteData);
+                renderReportesDocenteFiltrado();
             } catch(e) {
                 console.error(e);
             }
+        }
+
+        let _repDocenteData = [];
+
+        function renderReportesDocenteFiltrado() {
+            const tbody = document.getElementById("reportes-tbody");
+            if (!tbody) return;
+
+            const busqueda = normalizarTexto(document.getElementById("rep-doc-buscar")?.value);
+            const grado = document.getElementById("rep-doc-filtro-grado")?.value || "";
+            const fecha = document.getElementById("rep-doc-filtro-fecha")?.value || "";
+
+            const dataFiltrada = ordenarDatos("repDoc", _repDocenteData.filter(a => {
+                const coincideBusqueda = !busqueda || normalizarTexto(a.nombre).includes(busqueda);
+                const coincideGrado = !grado || a.grado === grado;
+                const coincideFecha = !fecha || a.fecha === fecha;
+                return coincideBusqueda && coincideGrado && coincideFecha;
+            }));
+
+            const info = paginarDatos("repDoc", dataFiltrada);
+            renderControlesPaginacion("repDoc", info, "renderReportesDocenteFiltrado");
+
+            if (info.pageData.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="5"><div class="empty-st">No hay registros que coincidan con la búsqueda.</div></td></tr>`;
+                return;
+            }
+            tbody.innerHTML = info.pageData.map(a => `
+                <tr>
+                    <td>${a.nombre}</td>
+                    <td>${a.grado}</td>
+                    <td>${a.fecha}</td>
+                    <td>${a.hora}</td>
+                    <td><span class="badge ${a.estado === 'Presente' ? 'presente' : a.estado === 'Retardo' ? 'retardo' : 'ausente'}">${a.estado}</span></td>
+                </tr>
+            `).join('');
         }
 
         // ======================================================
@@ -309,10 +358,14 @@
                     <div class="p-card-hd"><h6><i class="fas fa-plus-circle" style="margin-right: 0.4rem; color: var(--accent2);"></i>Nuevo Registro</h6></div>
                     <div class="p-card-bd">
                         <div class="form-grid">
-                            <div><label class="flbl2">Estudiante</label><input type="text" class="pinp" id="f-nombre" placeholder="Nombre completo" /></div>
-                            <div><label class="flbl2">Grado</label><input type="text" class="pinp" id="f-grado" placeholder="Ej: 10°" /></div>
+                            <div><label class="flbl2">Estudiante</label>
+                                <select class="pinp" id="f-estudiante" onchange="actualizarGradoSeleccionado()" style="background:rgba(255, 255, 255, 0.05)">
+                                    <option value="">Cargando estudiantes…</option>
+                                </select>
+                            </div>
+                            <div><label class="flbl2">Grado</label><input type="text" class="pinp" id="f-grado" placeholder="Se autocompleta" readonly /></div>
                             <div><label class="flbl2">Estado</label>
-                                <select class="pinp" id="edit-estado" style="background:rgba(255, 255, 255, 0.05)">
+                                <select class="pinp" id="f-estado" style="background:rgba(255, 255, 255, 0.05)">
                                     <option value="Presente">Presente</option>
                                     <option value="Ausente">Ausente</option>
                                     <option value="Retardo">Retardo</option>
@@ -322,70 +375,309 @@
                             <div><label class="flbl2">Hora</label><input type="time" class="pinp" id="f-hora" /></div>
                             <div style="display: flex; align-items: flex-end"><button class="btn-add" onclick="agregarRegistroAdmin()"><i class="fas fa-plus"></i> Registrar</button></div>
                         </div>
+                        <div id="f-err" style="display:none;color:#ff8080;margin-top:0.5rem;font-size:0.85rem;"></div>
                     </div>
-                </div>
-                <div class="p-card">
-                    <div class="p-card-hd"><h6><i class="fas fa-list" style="margin-right: 0.4rem; color: var(--blue-light);"></i>Todos los registros</h6></div>
-                    <div class="tbl-wrap"><table class="rtbl"><thead><tr><th>ID</th><th>Estudiante</th><th>Grado</th><th>Fecha</th><th>Hora</th><th>Estado</th><th>Acciones</th></tr></thead><tbody id="reg-tbody-admin"></tbody></table></div>
                 </div>
             `;
             document.getElementById("contenido-dinamico").innerHTML = html;
             const hoy = new Date();
             document.getElementById("f-fecha").value = hoy.toISOString().split("T")[0];
             document.getElementById("f-hora").value = hoy.toTimeString().slice(0, 5);
-            cargarTablaRegistrosAdmin();
+            cargarEstudiantesSelect();
         }
+
+        async function cargarEstudiantesSelect() {
+            const select = document.getElementById("f-estudiante");
+            if (!select) return;
+            try {
+                const res = await fetch("/api/estudiantes");
+                const estudiantes = await res.json();
+                if (!estudiantes.length) {
+                    select.innerHTML = `<option value="">No hay estudiantes registrados</option>`;
+                    return;
+                }
+                select.innerHTML = `<option value="">Selecciona un estudiante</option>` +
+                    estudiantes.map(e =>
+                        `<option value="${e.id}" data-nombre="${(e.nombre || "").replace(/"/g,'&quot;')}" data-grado="${(e.grado || "").replace(/"/g,'&quot;')}">${e.nombre} — ${e.grado} (${e.codigo})</option>`
+                    ).join("");
+            } catch (e) {
+                console.error(e);
+                select.innerHTML = `<option value="">Error al cargar estudiantes</option>`;
+            }
+        }
+
+        function actualizarGradoSeleccionado() {
+            const select = document.getElementById("f-estudiante");
+            const gradoInput = document.getElementById("f-grado");
+            if (!select || !gradoInput) return;
+            const opt = select.selectedOptions[0];
+            gradoInput.value = opt ? (opt.dataset.grado || "") : "";
+        }
+
+        // Quita tildes/mayúsculas para que la búsqueda sea más tolerante
+        // (ej: "jose" encuentra "José", "GARCIA" encuentra "García")
+        function normalizarTexto(txt) {
+            return (txt || "").toString()
+                .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+                .toLowerCase().trim();
+        }
+
+        // ---------- Notificaciones flotantes (toast) ----------
+        // Reemplaza a alert() para no interrumpir al usuario con un modal nativo.
+        function mostrarToast(mensaje, tipo = "success") {
+            let cont = document.getElementById("toast-panel");
+            if (!cont) {
+                cont = document.createElement("div");
+                cont.id = "toast-panel";
+                cont.style.cssText = "position:fixed;bottom:1.5rem;right:1.5rem;z-index:9999;display:flex;flex-direction:column;gap:0.5rem;";
+                document.body.appendChild(cont);
+            }
+            const colores = {
+                success: { bg: "#1f3d2c", border: "#3ecf8e", text: "#8CF5B9" },
+                error:   { bg: "#3d1f1f", border: "#e05555", text: "#ff9a9a" },
+            };
+            const c = colores[tipo] || colores.success;
+            const toast = document.createElement("div");
+            toast.textContent = (tipo === "success" ? "✓ " : "⚠ ") + mensaje;
+            toast.style.cssText = `background:${c.bg};border:1px solid ${c.border};color:${c.text};padding:0.7rem 1.1rem;border-radius:8px;font-size:0.9rem;box-shadow:0 4px 14px rgba(0,0,0,0.35);opacity:0;transform:translateY(8px);transition:opacity .25s ease, transform .25s ease;max-width:320px;`;
+            cont.appendChild(toast);
+            requestAnimationFrame(() => { toast.style.opacity = "1"; toast.style.transform = "translateY(0)"; });
+            setTimeout(() => {
+                toast.style.opacity = "0";
+                toast.style.transform = "translateY(8px)";
+                setTimeout(() => toast.remove(), 300);
+            }, 2800);
+        }
+
+        // ---------- Ordenamiento de columnas (clic en encabezado) ----------
+        // _sortState guarda, por tabla (prefix), qué columna está activa y en
+        // qué dirección (1 = ascendente, -1 = descendente).
+        let _sortState = {};
+
+        function ordenarColumna(prefix, columna, renderFn) {
+            if (!_sortState[prefix]) _sortState[prefix] = { col: null, dir: 1 };
+            const estado = _sortState[prefix];
+            if (estado.col === columna) {
+                estado.dir *= -1;
+            } else {
+                estado.col = columna;
+                estado.dir = 1;
+            }
+            actualizarIndicadoresOrden(prefix, estado);
+            renderFn();
+        }
+
+        function ordenarDatos(prefix, data) {
+            const estado = _sortState[prefix];
+            if (!estado || !estado.col) return data;
+            const copia = [...data];
+            copia.sort((a, b) => {
+                let va = a[estado.col], vb = b[estado.col];
+                if (estado.col === "id") {
+                    va = Number(va); vb = Number(vb);
+                } else {
+                    va = normalizarTexto(va); vb = normalizarTexto(vb);
+                }
+                if (va < vb) return -1 * estado.dir;
+                if (va > vb) return 1 * estado.dir;
+                return 0;
+            });
+            return copia;
+        }
+
+        function actualizarIndicadoresOrden(prefix, estado) {
+            document.querySelectorAll(`[id^="${prefix}-ind-"]`).forEach(el => el.textContent = "");
+            if (estado.col) {
+                const el = document.getElementById(`${prefix}-ind-${estado.col}`);
+                if (el) el.textContent = estado.dir === 1 ? " ▲" : " ▼";
+            }
+        }
+
+        // Encabezado clicable reutilizable: <th onclick=ordenarColumna(...)>Texto <span indicador></span></th>
+        function thOrdenable(prefix, columna, texto, renderFnNombre) {
+            return `<th onclick="ordenarColumna('${prefix}','${columna}',${renderFnNombre})" style="cursor:pointer;user-select:none;" title="Ordenar por ${texto}">${texto}<span id="${prefix}-ind-${columna}"></span></th>`;
+        }
+
+        // ---------- Paginación (client-side, sobre los datos ya filtrados/ordenados) ----------
+        const FILAS_POR_PAGINA = 15;
+        let _pageState = {};
+
+        function paginarDatos(prefix, data) {
+            if (!_pageState[prefix]) _pageState[prefix] = 1;
+            const totalPaginas = Math.max(1, Math.ceil(data.length / FILAS_POR_PAGINA));
+            if (_pageState[prefix] > totalPaginas) _pageState[prefix] = totalPaginas;
+            if (_pageState[prefix] < 1) _pageState[prefix] = 1;
+            const inicio = (_pageState[prefix] - 1) * FILAS_POR_PAGINA;
+            return {
+                pageData: data.slice(inicio, inicio + FILAS_POR_PAGINA),
+                totalPaginas,
+                paginaActual: _pageState[prefix],
+                total: data.length,
+            };
+        }
+
+        function cambiarPagina(prefix, delta, renderFn) {
+            _pageState[prefix] = (_pageState[prefix] || 1) + delta;
+            renderFn();
+        }
+
+        // Vuelve a la página 1 (se llama al cambiar la búsqueda o el filtro de grado,
+        // para no quedar "atrapado" en una página que ya no tiene resultados)
+        function resetPagina(prefix) {
+            _pageState[prefix] = 1;
+        }
+
+        function renderControlesPaginacion(prefix, info, renderFnNombre) {
+            const contenedor = document.getElementById(`${prefix}-paginacion`);
+            if (!contenedor) return;
+            if (info.total === 0) { contenedor.innerHTML = ""; return; }
+            contenedor.innerHTML = `
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:0.75rem;padding:0.6rem 0 0.2rem;flex-wrap:wrap;">
+                    <span style="font-size:0.85rem;color:#9aa5b1;">${info.total} registro${info.total === 1 ? '' : 's'} · Página ${info.paginaActual} de ${info.totalPaginas}</span>
+                    <div style="display:flex;gap:0.5rem;">
+                        <button class="act-btn" ${info.paginaActual <= 1 ? 'disabled style="opacity:.4;cursor:not-allowed;"' : ''} onclick="cambiarPagina('${prefix}',-1,${renderFnNombre})" title="Anterior"><i class="fas fa-chevron-left"></i></button>
+                        <button class="act-btn" ${info.paginaActual >= info.totalPaginas ? 'disabled style="opacity:.4;cursor:not-allowed;"' : ''} onclick="cambiarPagina('${prefix}',1,${renderFnNombre})" title="Siguiente"><i class="fas fa-chevron-right"></i></button>
+                    </div>
+                </div>`;
+        }
+
+        let _regAdminData = [];
 
         async function cargarTablaRegistrosAdmin() {
             try {
                 const res = await fetch("/api/asistencia");
-                const data = await res.json();
-                const tbody = document.getElementById("reg-tbody-admin");
-                if (!tbody) return;
-                if (data.length === 0) {
-                    tbody.innerHTML = `<tr><td colspan="7"><div class="empty-st">Sin registros</div></tr></tr>`;
-                    return;
-                }
-                tbody.innerHTML = data.map(a => `
-                    <tr id="reg-row-${a.id}">
-                        <td>${a.id}</td>
-                        <td>${a.nombre}</td>
-                        <td>${a.grado}</td>
-                        <td>${a.fecha}</td>
-                        <td>${a.hora}</td>
-                        <td><span class="badge ${a.estado === 'Presente' ? 'presente' : a.estado === 'Retardo' ? 'retardo' : 'ausente'}">${a.estado}</span></td>
-                        <td>
-                            <div class="act-btns">
-                                <button class="act-btn edit" onclick="editarRegistroAdmin(${a.id})" title="Editar"><i class="fas fa-pen"></i></button>
-                                <button class="act-btn del"  onclick="eliminarRegistroAdmin(${a.id})" title="Eliminar"><i class="fas fa-trash"></i></button>
-                            </div>
-                        </td>
-                    </tr>
-                `).join('');
+                _regAdminData = await res.json();
+                poblarFiltroGrados("reg-filtro-grado", _regAdminData);
+                renderRegistrosAdminFiltrado();
             } catch(e) { console.error(e); }
         }
 
+        // Llena un <select> de filtro con los grados que realmente existen
+        // en los datos, sin duplicar opciones ni perder el grado seleccionado.
+        function poblarFiltroGrados(selectId, data) {
+            const select = document.getElementById(selectId);
+            if (!select) return;
+            const seleccionActual = select.value;
+            const grados = [...new Set(data.map(a => a.grado).filter(Boolean))]
+                .sort((a, b) => a.localeCompare(b, "es", { numeric: true }));
+            select.innerHTML = `<option value="">Todos los grados</option>` +
+                grados.map(g => `<option value="${g}">${g}</option>`).join("");
+            if (grados.includes(seleccionActual)) select.value = seleccionActual;
+        }
+
+        // IDs de los campos de filtro de cada tabla, para poder limpiarlos de una sola vez
+        const FILTRO_IDS = {
+            reg:    { buscar: "reg-buscar",     grado: "reg-filtro-grado",     fecha: "reg-filtro-fecha" },
+            repDoc: { buscar: "rep-doc-buscar", grado: "rep-doc-filtro-grado", fecha: "rep-doc-filtro-fecha" },
+        };
+
+        function limpiarFiltros(prefix, renderFn) {
+            const ids = FILTRO_IDS[prefix];
+            if (!ids) return;
+            const buscar = document.getElementById(ids.buscar);
+            const grado = document.getElementById(ids.grado);
+            const fecha = document.getElementById(ids.fecha);
+            if (buscar) buscar.value = "";
+            if (grado) grado.value = "";
+            if (fecha) fecha.value = "";
+            resetPagina(prefix);
+            renderFn();
+        }
+
+        function renderRegistrosAdminFiltrado() {
+            const tbody = document.getElementById("reg-tbody-admin");
+            if (!tbody) return;
+
+            const busqueda = normalizarTexto(document.getElementById("reg-buscar")?.value);
+            const grado = document.getElementById("reg-filtro-grado")?.value || "";
+            const fecha = document.getElementById("reg-filtro-fecha")?.value || "";
+
+            const dataFiltrada = ordenarDatos("reg", _regAdminData.filter(a => {
+                const coincideBusqueda = !busqueda || normalizarTexto(a.nombre).includes(busqueda);
+                const coincideGrado = !grado || a.grado === grado;
+                const coincideFecha = !fecha || a.fecha === fecha;
+                return coincideBusqueda && coincideGrado && coincideFecha;
+            }));
+
+            const info = paginarDatos("reg", dataFiltrada);
+            renderControlesPaginacion("reg", info, "renderRegistrosAdminFiltrado");
+
+            if (info.pageData.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="7"><div class="empty-st">No hay registros que coincidan con la búsqueda.</div></td></tr>`;
+                return;
+            }
+            tbody.innerHTML = info.pageData.map(a => `
+                <tr id="reg-row-${a.id}">
+                    <td>${a.id}</td>
+                    <td>${a.nombre}</td>
+                    <td>${a.grado}</td>
+                    <td>${a.fecha}</td>
+                    <td>${a.hora}</td>
+                    <td><span class="badge ${a.estado === 'Presente' ? 'presente' : a.estado === 'Retardo' ? 'retardo' : 'ausente'}">${a.estado}</span></td>
+                    <td>
+                        <div class="act-btns">
+                            <button class="act-btn edit" onclick="editarRegistroAdmin(${a.id})" title="Editar"><i class="fas fa-pen"></i></button>
+                            <button class="act-btn del"  onclick="eliminarRegistroAdmin(${a.id})" title="Eliminar"><i class="fas fa-trash"></i></button>
+                        </div>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
         window.agregarRegistroAdmin = async function() {
-            const nombre = document.getElementById("f-nombre")?.value.trim();
+            const err = document.getElementById("f-err");
+            const select = document.getElementById("f-estudiante");
+            const opt = select?.selectedOptions[0];
+            const estudianteId = select?.value;
+            const nombre = opt?.dataset.nombre;
             const grado = document.getElementById("f-grado")?.value;
             const estado = document.getElementById("f-estado")?.value;
             const fecha = document.getElementById("f-fecha")?.value;
             const hora = document.getElementById("f-hora")?.value;
-            if (!nombre || !grado || !fecha || !hora) {
-                alert("Completa todos los campos");
+
+            if (err) err.style.display = "none";
+
+            if (!estudianteId || !nombre || !grado || !estado || !fecha || !hora) {
+                if (err) {
+                    err.textContent = "⚠ Selecciona un estudiante y completa todos los campos.";
+                    err.style.display = "block";
+                }
                 return;
             }
+
             try {
-                await fetch("/api/asistencia", {
+                const res = await fetch("/api/asistencia", {
                     method: "POST",
-                    headers: { "Content-Type": "application/json", "X-CSRF-TOKEN": document.querySelector('meta[name="csrf-token"]').content },
-                    body: JSON.stringify({ nombre, grado, estado, fecha, hora })
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Accept": "application/json",
+                        "X-CSRF-TOKEN": document.querySelector('meta[name="csrf-token"]').content
+                    },
+                    body: JSON.stringify({ estudiante_id: estudianteId, nombre, grado, estado, fecha, hora })
                 });
-                document.getElementById("f-nombre").value = "";
+                if (!res.ok) {
+                    const errData = await res.json().catch(() => ({}));
+                    const mensaje = errData.error
+                        || errData.message
+                        || (errData.errors ? Object.values(errData.errors).flat().join(" ") : null)
+                        || "No se pudo guardar el registro.";
+                    if (err) {
+                        err.textContent = "⚠ " + mensaje;
+                        err.style.display = "block";
+                    }
+                    return;
+                }
+                select.value = "";
                 document.getElementById("f-grado").value = "";
-                cargarTablaRegistrosAdmin();
                 actualizarDashboardAdmin();
-            } catch(e) { console.error(e); }
+                mostrarToast("Registro guardado correctamente.");
+            } catch(e) {
+                console.error(e);
+                if (err) {
+                    err.textContent = "⚠ Error de conexión al guardar.";
+                    err.style.display = "block";
+                }
+            }
         };
 
         window.editarRegistroAdmin = function(id) {
@@ -421,62 +713,404 @@
             const estado = document.getElementById("re-estado-" + id)?.value;
             const fecha  = document.getElementById("re-fecha-"  + id)?.value;
             const hora   = document.getElementById("re-hora-"   + id)?.value;
-            if (!nombre || !grado || !fecha || !hora) { alert("Completa todos los campos."); return; }
+            if (!nombre || !grado || !fecha || !hora) { mostrarToast("Completa todos los campos.", "error"); return; }
             try {
                 const res = await fetch("/api/asistencia/" + id, {
                     method: "PUT",
                     headers: {
                         "Content-Type": "application/json",
+                        "Accept": "application/json",
                         "X-CSRF-TOKEN": document.querySelector('meta[name="csrf-token"]').content
                     },
                     body: JSON.stringify({ nombre, grado, estado, fecha, hora })
                 });
                 if (!res.ok) {
-                    const err = await res.json().catch(() => ({}));
-                    alert("Error al guardar: " + (err.message || res.status));
+                    const errData = await res.json().catch(() => ({}));
+                    const mensaje = errData.message
+                        || (errData.errors ? Object.values(errData.errors).flat().join(" ") : null)
+                        || "No se pudo guardar el cambio.";
+                    mostrarToast(mensaje, "error");
                     return;
                 }
                 cargarTablaRegistrosAdmin();
                 actualizarDashboardAdmin();
-            } catch(e) { alert("Error de conexión: " + e.message); }
+                mostrarToast("Registro actualizado correctamente.");
+            } catch(e) {
+                mostrarToast("Error de conexión: " + e.message, "error");
+            }
         };
 
         window.eliminarRegistroAdmin = async function(id) {
             if (!confirm("¿Eliminar este registro?")) return;
             try {
-                await fetch(`/api/asistencia/${id}`, { method: "DELETE", headers: { "X-CSRF-TOKEN": document.querySelector('meta[name="csrf-token"]').content } });
+                const res = await fetch(`/api/asistencia/${id}`, {
+                    method: "DELETE",
+                    headers: {
+                        "Accept": "application/json",
+                        "X-CSRF-TOKEN": document.querySelector('meta[name="csrf-token"]').content
+                    }
+                });
+                if (!res.ok) {
+                    const errData = await res.json().catch(() => ({}));
+                    mostrarToast(errData.message || "No se pudo eliminar el registro.", "error");
+                    return;
+                }
                 cargarTablaRegistrosAdmin();
                 actualizarDashboardAdmin();
-            } catch(e) { console.error(e); }
+                mostrarToast("Registro eliminado correctamente.");
+            } catch(e) {
+                mostrarToast("Error de conexión: " + e.message, "error");
+            }
         };
 
         function cargarReportesAdmin() {
             const html = `
                 <div class="p-card">
                     <div class="p-card-hd"><h6><i class="fas fa-chart-bar" style="margin-right: 0.4rem; color: var(--blue-light);"></i>Todos los registros</h6></div>
-                    <div class="tbl-wrap"><table class="rtbl"><thead><tr><th>Estudiante</th><th>Grado</th><th>Fecha</th><th>Hora</th><th>Estado</th></tr></thead><tbody id="reportes-admin-tbody"></tbody></table></div>
+                    <div class="p-card-bd" style="padding-top:0;padding-bottom:0.75rem;">
+                        <div style="display:flex;gap:0.75rem;flex-wrap:wrap;margin-bottom:0.75rem;align-items:center;">
+                            <input type="text" class="pinp" id="reg-buscar" placeholder="🔎 Buscar por nombre..." style="flex:1;min-width:220px;" oninput="resetPagina('reg');renderRegistrosAdminFiltrado()" />
+                            <select class="pinp" id="reg-filtro-grado" style="min-width:180px;background:rgba(255,255,255,0.05)" onchange="resetPagina('reg');renderRegistrosAdminFiltrado()">
+                                <option value="">Todos los grados</option>
+                            </select>
+                            <input type="date" class="pinp" id="reg-filtro-fecha" title="Filtrar por fecha" style="min-width:160px;background:rgba(255,255,255,0.05)" onchange="resetPagina('reg');renderRegistrosAdminFiltrado()" />
+                            <button class="act-btn" title="Limpiar filtros" onclick="limpiarFiltros('reg', renderRegistrosAdminFiltrado)"><i class="fas fa-times"></i> Limpiar</button>
+                        </div>
+                    </div>
+                    <div class="tbl-wrap"><table class="rtbl"><thead><tr>${thOrdenable('reg','id','ID','renderRegistrosAdminFiltrado')}${thOrdenable('reg','nombre','Estudiante','renderRegistrosAdminFiltrado')}${thOrdenable('reg','grado','Grado','renderRegistrosAdminFiltrado')}${thOrdenable('reg','fecha','Fecha','renderRegistrosAdminFiltrado')}${thOrdenable('reg','hora','Hora','renderRegistrosAdminFiltrado')}${thOrdenable('reg','estado','Estado','renderRegistrosAdminFiltrado')}<th>Acciones</th></tr></thead><tbody id="reg-tbody-admin"></tbody></table></div>
+                    <div id="reg-paginacion" style="padding:0 1rem;"></div>
                 </div>
             `;
             document.getElementById("contenido-dinamico").innerHTML = html;
-            cargarReportesAdminData();
+            cargarTablaRegistrosAdmin();
         }
 
-        async function cargarReportesAdminData() {
+        // ======================================================
+        // 7. VISTA ADMIN: GRADOS (CRUD)
+        // ======================================================
+        function cargarGradosAdmin() {
+            const html = `
+                <div class="p-card">
+                    <div class="p-card-hd"><h6><i class="fas fa-plus-circle" style="margin-right: 0.4rem; color: var(--accent2);"></i>Nuevo Grado</h6></div>
+                    <div class="p-card-bd">
+                        <div class="form-grid">
+                            <div><label class="flbl2">Nombre</label><input type="text" class="pinp" id="g-nombre" placeholder="Ej: 6°" maxlength="20" /></div>
+                            <div><label class="flbl2">Descripción</label><input type="text" class="pinp" id="g-descripcion" placeholder="Opcional" maxlength="100" /></div>
+                            <div style="display:flex;align-items:flex-end"><button class="btn-add" onclick="agregarGrado()"><i class="fas fa-plus"></i> Agregar</button></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="p-card">
+                    <div class="p-card-hd"><h6><i class="fas fa-layer-group" style="margin-right: 0.4rem; color: var(--blue-light);"></i>Grados registrados</h6></div>
+                    <div class="tbl-wrap"><table class="rtbl"><thead><tr><th>Nombre</th><th>Descripción</th><th>Nº estudiantes</th><th>Acciones</th></tr></thead><tbody id="grados-tbody"></tbody></table></div>
+                </div>
+            `;
+            document.getElementById("contenido-dinamico").innerHTML = html;
+            cargarGradosData();
+        }
+
+        let _gradosData = [];
+
+        async function cargarGradosData() {
             try {
-                const res = await fetch("/api/asistencia");
-                const data = await res.json();
-                const tbody = document.getElementById("reportes-admin-tbody");
-                if (!tbody) return;
-                tbody.innerHTML = data.map(a => `
-                    <tr><td>${a.nombre}</td><td>${a.grado}</td><td>${a.fecha}</td><td>${a.hora}</td><td><span class="badge ${a.estado === 'Presente' ? 'presente' : a.estado === 'Retardo' ? 'retardo' : 'ausente'}">${a.estado}</span></td></tr>
-                `).join('');
-            } catch(e) { console.error(e); }
+                const res = await fetch("/grados", { headers: { "Accept": "application/json" } });
+                _gradosData = await res.json();
+                renderGradosTabla();
+            } catch(e) { console.error(e); mostrarToast("No se pudieron cargar los grados.", "error"); }
         }
 
+        function renderGradosTabla() {
+            const tbody = document.getElementById("grados-tbody");
+            if (!tbody) return;
+            if (_gradosData.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="4"><div class="empty-st">No hay grados registrados todavía.</div></td></tr>`;
+                return;
+            }
+            const ordenados = [...(_gradosData)].sort((a, b) => (a.nombre || "").localeCompare(b.nombre || "", "es", { numeric: true }));
+            tbody.innerHTML = ordenados.map(g => `
+                <tr id="grado-row-${g.id}">
+                    <td>${g.nombre ?? ""}</td>
+                    <td>${g.descripcion ?? "—"}</td>
+                    <td>${g.num_estudiantes ?? 0}</td>
+                    <td>
+                        <div class="act-btns">
+                            <button class="act-btn edit" onclick="editarGrado(${g.id})" title="Editar"><i class="fas fa-pen"></i></button>
+                            <button class="act-btn del"  onclick="eliminarGrado(${g.id})" title="Eliminar"><i class="fas fa-trash"></i></button>
+                        </div>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        window.agregarGrado = async function() {
+            const nombre = document.getElementById("g-nombre")?.value.trim();
+            const descripcion = document.getElementById("g-descripcion")?.value.trim();
+            if (!nombre) { mostrarToast("El nombre del grado es obligatorio.", "error"); return; }
+            try {
+                const res = await fetch("/grados", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Accept": "application/json",
+                        "X-CSRF-TOKEN": document.querySelector('meta[name="csrf-token"]').content
+                    },
+                    body: JSON.stringify({ nombre, descripcion })
+                });
+                if (!res.ok) {
+                    const errData = await res.json().catch(() => ({}));
+                    const mensaje = errData.message || (errData.errors ? Object.values(errData.errors).flat().join(" ") : "No se pudo crear el grado.");
+                    mostrarToast(mensaje, "error");
+                    return;
+                }
+                document.getElementById("g-nombre").value = "";
+                document.getElementById("g-descripcion").value = "";
+                cargarGradosData();
+                mostrarToast("Grado agregado correctamente.");
+            } catch(e) { mostrarToast("Error de conexión: " + e.message, "error"); }
+        };
+
+        window.editarGrado = function(id) {
+            const row = document.getElementById("grado-row-" + id);
+            if (!row) return;
+            const g = _gradosData.find(x => x.id === id);
+            if (!g) return;
+            row.innerHTML =
+                "<td><input type='text' class='pinp' id='ge-nombre-" + id + "' value='" + (g.nombre ?? "").replace(/'/g, "&#39;") + "' maxlength='20' /></td>" +
+                "<td><input type='text' class='pinp' id='ge-descripcion-" + id + "' value='" + (g.descripcion ?? "").replace(/'/g, "&#39;") + "' maxlength='100' /></td>" +
+                "<td>" + (g.num_estudiantes ?? 0) + "</td>" +
+                "<td><div class='act-btns'>" +
+                    "<button class='act-btn edit' onclick='guardarEdicionGrado(" + id + ")' title='Guardar'><i class='fas fa-check'></i></button>" +
+                    "<button class='act-btn del'  onclick='renderGradosTabla()' title='Cancelar'><i class='fas fa-times'></i></button>" +
+                "</div></td>";
+        };
+
+        window.guardarEdicionGrado = async function(id) {
+            const nombre = document.getElementById("ge-nombre-" + id)?.value.trim();
+            const descripcion = document.getElementById("ge-descripcion-" + id)?.value.trim();
+            if (!nombre) { mostrarToast("El nombre del grado es obligatorio.", "error"); return; }
+            try {
+                const res = await fetch("/grados/" + id, {
+                    method: "PUT",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Accept": "application/json",
+                        "X-CSRF-TOKEN": document.querySelector('meta[name="csrf-token"]').content
+                    },
+                    body: JSON.stringify({ nombre, descripcion })
+                });
+                if (!res.ok) {
+                    const errData = await res.json().catch(() => ({}));
+                    mostrarToast(errData.message || "No se pudo guardar el grado.", "error");
+                    return;
+                }
+                await cargarGradosData();
+                mostrarToast("Grado actualizado correctamente.");
+            } catch(e) { mostrarToast("Error de conexión: " + e.message, "error"); }
+        };
+
+        window.eliminarGrado = async function(id) {
+            if (!confirm("¿Eliminar este grado? Los horarios asociados también podrían quedar huérfanos.")) return;
+            try {
+                const res = await fetch("/grados/" + id, {
+                    method: "DELETE",
+                    headers: { "Accept": "application/json", "X-CSRF-TOKEN": document.querySelector('meta[name="csrf-token"]').content }
+                });
+                if (!res.ok) {
+                    const errData = await res.json().catch(() => ({}));
+                    mostrarToast(errData.message || "No se pudo eliminar el grado.", "error");
+                    return;
+                }
+                cargarGradosData();
+                mostrarToast("Grado eliminado correctamente.");
+            } catch(e) { mostrarToast("Error de conexión: " + e.message, "error"); }
+        };
+
         // ======================================================
-        // 7. LOGOUT Y INICIALIZACIÓN
+        // 8. VISTA ADMIN: HORARIOS (CRUD)
         // ======================================================
-        function doLogout() {
+        function cargarHorariosAdmin() {
+            const html = `
+                <div class="p-card">
+                    <div class="p-card-hd"><h6><i class="fas fa-plus-circle" style="margin-right: 0.4rem; color: var(--accent2);"></i>Nuevo Horario</h6></div>
+                    <div class="p-card-bd">
+                        <div class="form-grid">
+                            <div><label class="flbl2">Grado</label>
+                                <select class="pinp" id="h-grado" style="background:rgba(255,255,255,0.05)">
+                                    <option value="">Cargando grados…</option>
+                                </select>
+                            </div>
+                            <div><label class="flbl2">Hora de entrada</label><input type="time" class="pinp" id="h-entrada" /></div>
+                            <div><label class="flbl2">Hora límite (retardo)</label><input type="time" class="pinp" id="h-limite" /></div>
+                            <div><label class="flbl2">Días</label><input type="text" class="pinp" id="h-dias" placeholder="Ej: Lunes a Viernes" maxlength="60" /></div>
+                            <div style="display:flex;align-items:flex-end"><button class="btn-add" onclick="agregarHorario()"><i class="fas fa-plus"></i> Agregar</button></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="p-card">
+                    <div class="p-card-hd"><h6><i class="fas fa-clock" style="margin-right: 0.4rem; color: var(--blue-light);"></i>Horarios registrados</h6></div>
+                    <div class="tbl-wrap"><table class="rtbl"><thead><tr><th>Grado</th><th>Entrada</th><th>Hora límite</th><th>Días</th><th>Acciones</th></tr></thead><tbody id="horarios-tbody"></tbody></table></div>
+                </div>
+            `;
+            document.getElementById("contenido-dinamico").innerHTML = html;
+            cargarGradosParaSelectHorario();
+            cargarHorariosData();
+        }
+
+        let _horariosData = [];
+
+        async function cargarGradosParaSelectHorario() {
+            const select = document.getElementById("h-grado");
+            if (!select) return;
+            try {
+                const res = await fetch("/grados", { headers: { "Accept": "application/json" } });
+                const grados = await res.json();
+                if (!grados.length) {
+                    select.innerHTML = `<option value="">Primero crea un grado</option>`;
+                    return;
+                }
+                const ordenados = [...grados].sort((a, b) => (a.nombre || "").localeCompare(b.nombre || "", "es", { numeric: true }));
+                select.innerHTML = `<option value="">Selecciona un grado</option>` +
+                    ordenados.map(g => `<option value="${g.id}">${g.nombre}</option>`).join("");
+            } catch(e) {
+                console.error(e);
+                select.innerHTML = `<option value="">Error al cargar grados</option>`;
+            }
+        }
+
+        async function cargarHorariosData() {
+            try {
+                const res = await fetch("/horarios", { headers: { "Accept": "application/json" } });
+                _horariosData = await res.json();
+                renderHorariosTabla();
+            } catch(e) { console.error(e); mostrarToast("No se pudieron cargar los horarios.", "error"); }
+        }
+
+        function renderHorariosTabla() {
+            const tbody = document.getElementById("horarios-tbody");
+            if (!tbody) return;
+            if (_horariosData.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="5"><div class="empty-st">No hay horarios registrados todavía.</div></td></tr>`;
+                return;
+            }
+            tbody.innerHTML = _horariosData.map(h => `
+                <tr id="horario-row-${h.id}">
+                    <td>${h.grado?.nombre ?? "—"}</td>
+                    <td>${(h.hora_entrada || "").slice(0,5)}</td>
+                    <td>${(h.hora_limite || "").slice(0,5)}</td>
+                    <td>${h.dias ?? "—"}</td>
+                    <td>
+                        <div class="act-btns">
+                            <button class="act-btn edit" onclick="editarHorario(${h.id})" title="Editar"><i class="fas fa-pen"></i></button>
+                            <button class="act-btn del"  onclick="eliminarHorario(${h.id})" title="Eliminar"><i class="fas fa-trash"></i></button>
+                        </div>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        window.agregarHorario = async function() {
+            const grado_id = document.getElementById("h-grado")?.value;
+            const hora_entrada = document.getElementById("h-entrada")?.value;
+            const hora_limite = document.getElementById("h-limite")?.value;
+            const dias = document.getElementById("h-dias")?.value.trim();
+            if (!grado_id || !hora_entrada || !hora_limite) { mostrarToast("Selecciona el grado y completa las horas.", "error"); return; }
+            try {
+                const res = await fetch("/horarios", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Accept": "application/json",
+                        "X-CSRF-TOKEN": document.querySelector('meta[name="csrf-token"]').content
+                    },
+                    body: JSON.stringify({ grado_id, hora_entrada, hora_limite, dias })
+                });
+                if (!res.ok) {
+                    const errData = await res.json().catch(() => ({}));
+                    const mensaje = errData.message || (errData.errors ? Object.values(errData.errors).flat().join(" ") : "No se pudo crear el horario.");
+                    mostrarToast(mensaje, "error");
+                    return;
+                }
+                document.getElementById("h-grado").value = "";
+                document.getElementById("h-entrada").value = "";
+                document.getElementById("h-limite").value = "";
+                document.getElementById("h-dias").value = "";
+                cargarHorariosData();
+                mostrarToast("Horario agregado correctamente.");
+            } catch(e) { mostrarToast("Error de conexión: " + e.message, "error"); }
+        };
+
+        window.editarHorario = function(id) {
+            const row = document.getElementById("horario-row-" + id);
+            const h = _horariosData.find(x => x.id === id);
+            if (!row || !h) return;
+            row.innerHTML =
+                "<td>" + (h.grado?.nombre ?? "—") + "</td>" +
+                "<td><input type='time' class='pinp' id='he-entrada-" + id + "' value='" + (h.hora_entrada || "").slice(0,5) + "' /></td>" +
+                "<td><input type='time' class='pinp' id='he-limite-"  + id + "' value='" + (h.hora_limite  || "").slice(0,5) + "' /></td>" +
+                "<td><input type='text' class='pinp' id='he-dias-"    + id + "' value='" + (h.dias ?? "").replace(/'/g, "&#39;") + "' /></td>" +
+                "<td><div class='act-btns'>" +
+                    "<button class='act-btn edit' onclick='guardarEdicionHorario(" + id + ")' title='Guardar'><i class='fas fa-check'></i></button>" +
+                    "<button class='act-btn del'  onclick='renderHorariosTabla()' title='Cancelar'><i class='fas fa-times'></i></button>" +
+                "</div></td>";
+        };
+
+        window.guardarEdicionHorario = async function(id) {
+            const hora_entrada = document.getElementById("he-entrada-" + id)?.value;
+            const hora_limite = document.getElementById("he-limite-" + id)?.value;
+            const dias = document.getElementById("he-dias-" + id)?.value.trim();
+            if (!hora_entrada || !hora_limite) { mostrarToast("Completa ambas horas.", "error"); return; }
+            try {
+                const res = await fetch("/horarios/" + id, {
+                    method: "PUT",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Accept": "application/json",
+                        "X-CSRF-TOKEN": document.querySelector('meta[name="csrf-token"]').content
+                    },
+                    body: JSON.stringify({ hora_entrada, hora_limite, dias })
+                });
+                if (!res.ok) {
+                    const errData = await res.json().catch(() => ({}));
+                    mostrarToast(errData.message || "No se pudo guardar el horario.", "error");
+                    return;
+                }
+                await cargarHorariosData();
+                mostrarToast("Horario actualizado correctamente.");
+            } catch(e) { mostrarToast("Error de conexión: " + e.message, "error"); }
+        };
+
+        window.eliminarHorario = async function(id) {
+            if (!confirm("¿Eliminar este horario?")) return;
+            try {
+                const res = await fetch("/horarios/" + id, {
+                    method: "DELETE",
+                    headers: { "Accept": "application/json", "X-CSRF-TOKEN": document.querySelector('meta[name="csrf-token"]').content }
+                });
+                if (!res.ok) {
+                    const errData = await res.json().catch(() => ({}));
+                    mostrarToast(errData.message || "No se pudo eliminar el horario.", "error");
+                    return;
+                }
+                cargarHorariosData();
+                mostrarToast("Horario eliminado correctamente.");
+            } catch(e) { mostrarToast("Error de conexión: " + e.message, "error"); }
+        };
+
+        // ======================================================
+        // 9. LOGOUT Y INICIALIZACIÓN
+        // ======================================================
+        async function doLogout() {
+            try {
+                await fetch("/api/logout", {
+                    method: "POST",
+                    headers: {
+                        "Accept": "application/json",
+                        "X-CSRF-TOKEN": document.querySelector('meta[name="csrf-token"]').content
+                    }
+                });
+            } catch (e) {
+                console.error(e);
+            }
             sessionStorage.removeItem("auta_user");
             sessionStorage.removeItem("auta_role");
             window.location.href = "/login";

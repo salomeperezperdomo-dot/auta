@@ -4,49 +4,70 @@ use App\Http\Controllers\EstudianteController;
 use App\Http\Controllers\AsistenciaController;
 use App\Http\Controllers\UsuarioController;
 use App\Http\Controllers\GradoController;
+use App\Http\Controllers\GrupoController;
 use App\Http\Controllers\HorarioController;
-use App\Http\Controllers\LogController;
 use App\Models\Estudiante;
 
-// Vista del escáner QR (solo para docentes y admin)
-Route::get('/escaner', [AsistenciaController::class, 'mostrarEscaner'])->name('escaner');
-
-// Registrar asistencia desde el QR
-Route::post('/registrar-asistencia', [AsistenciaController::class, 'registrarPorQR'])->name('asistencia.registrar');
-
-// Vistas
+// ══════════════════════════════════════════════════════
+// RUTAS PÚBLICAS (no requieren haber iniciado sesión)
+// ══════════════════════════════════════════════════════
 Route::get('/', function () { return view('index'); });
-Route::get('/login', function () { return view('login'); });
-Route::get('/panel', function () { return view('panel'); });
-
-// API Estudiantes
-Route::get('/api/estudiantes', [EstudianteController::class, 'index']);
-Route::post('/api/estudiantes', [EstudianteController::class, 'store']);
-Route::put('/api/estudiantes/{id}', [EstudianteController::class, 'update']);
-Route::delete('/api/estudiantes/{id}', [EstudianteController::class, 'destroy']);
-
-// API Asistencia
-Route::get('/api/asistencia', [AsistenciaController::class, 'index']);
-Route::post('/api/asistencia', [AsistenciaController::class, 'store']);
-Route::delete('/api/asistencia/{id}', [AsistenciaController::class, 'destroy']);
-
-// API Login
+Route::get('/login', function () { return view('login'); })->name('login');
 Route::post('/api/login', [UsuarioController::class, 'login']);
 
-Route::get('/carnets', function () {
-    $estudiantes = Estudiante::all();
-    return view('carnets', compact('estudiantes'));
-})->name('carnets');
+// ══════════════════════════════════════════════════════
+// RUTAS PROTEGIDAS (requieren sesión iniciada, cualquier rol)
+// ══════════════════════════════════════════════════════
+Route::middleware('auth')->group(function () {
 
-Route::put('/api/asistencia/{id}', [AsistenciaController::class, 'update']);
+    Route::post('/api/logout', [UsuarioController::class, 'logout']);
+    Route::get('/panel', function () { return view('panel'); });
 
-// API de grados
-Route::apiResource('grados', GradoController::class);
+    // Lectura: admin, docente y estudiante pueden consultar
+    Route::get('/api/asistencia', [AsistenciaController::class, 'index']);
+    Route::get('/api/estudiantes', [EstudianteController::class, 'index']);
+    Route::get('/grados', [GradoController::class, 'index']);
+    Route::get('/grados/{grado}', [GradoController::class, 'show']);
+    Route::get('/grupos', [GrupoController::class, 'index']);
+    Route::get('/grupos/{grupo}', [GrupoController::class, 'show']);
+    Route::get('/horarios', [HorarioController::class, 'index']);
+    Route::get('/horarios/{horario}', [HorarioController::class, 'show']);
 
-// API de horarios
-Route::apiResource('horarios', HorarioController::class);
+    // ══════════════════════════════════════════════════
+    // SOLO ADMIN: gestión completa (crear/editar/eliminar)
+    // y las páginas de escáner/carnets, tal como ya lo
+    // refleja el menú del panel (solo el admin las ve).
+    // ══════════════════════════════════════════════════
+    Route::middleware('role:admin')->group(function () {
 
-// API de logs (solo lectura y creación)
-Route::get('logs', [LogController::class, 'index']);
-Route::post('logs', [LogController::class, 'store']);
-Route::get('logs/{id}', [LogController::class, 'show']);
+        Route::get('/escaner', [AsistenciaController::class, 'mostrarEscaner'])->name('escaner');
+        Route::post('/registrar-asistencia', [AsistenciaController::class, 'registrarPorQR'])->name('asistencia.registrar');
+        Route::get('/carnets', function () {
+            $estudiantes = Estudiante::with(['grado', 'grupo'])->get();
+            return view('carnets', compact('estudiantes'));
+        })->name('carnets');
+
+        // Escritura de asistencia
+        Route::post('/api/asistencia', [AsistenciaController::class, 'store']);
+        Route::put('/api/asistencia/{id}', [AsistenciaController::class, 'update']);
+        Route::delete('/api/asistencia/{id}', [AsistenciaController::class, 'destroy']);
+
+        // Escritura de estudiantes
+        Route::post('/api/estudiantes', [EstudianteController::class, 'store']);
+        Route::put('/api/estudiantes/{id}', [EstudianteController::class, 'update']);
+        Route::delete('/api/estudiantes/{id}', [EstudianteController::class, 'destroy']);
+
+        // Escritura de grados, grupos y horarios
+        Route::post('/grados', [GradoController::class, 'store']);
+        Route::put('/grados/{grado}', [GradoController::class, 'update']);
+        Route::delete('/grados/{grado}', [GradoController::class, 'destroy']);
+
+        Route::post('/grupos', [GrupoController::class, 'store']);
+        Route::put('/grupos/{grupo}', [GrupoController::class, 'update']);
+        Route::delete('/grupos/{grupo}', [GrupoController::class, 'destroy']);
+
+        Route::post('/horarios', [HorarioController::class, 'store']);
+        Route::put('/horarios/{horario}', [HorarioController::class, 'update']);
+        Route::delete('/horarios/{horario}', [HorarioController::class, 'destroy']);
+    });
+});

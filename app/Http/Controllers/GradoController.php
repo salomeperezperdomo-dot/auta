@@ -20,6 +20,7 @@ class GradoController extends Controller
         ]);
 
         $grado = Grado::create($request->all());
+
         return response()->json($grado, 201);
     }
 

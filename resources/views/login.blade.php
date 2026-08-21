@@ -114,7 +114,11 @@
               <label class="chk-lbl"
                 ><input type="checkbox" /> Recordarme</label
               >
-              <a href="#" class="fgt-lnk">¿Olvidaste tu contraseña?</a>
+              <a href="#" class="fgt-lnk" onclick="mostrarAvisoRecuperacion(); return false;">¿Olvidaste tu contraseña?</a>
+            </div>
+            <div class="alert-err" id="fgtMsg" style="background:rgba(46,111,242,0.12);border-color:#2E6FF2;color:#2E6FF2;">
+              <i class="fas fa-info-circle"></i>
+              <span>Por ahora este sistema no envía correos de recuperación. Contacta al administrador para restablecer tu contraseña.</span>
             </div>
             <!-- doLogin() ahora valida contra la base de datos real
              (POST /api/login) en vez de credenciales fijas en JS -->
@@ -165,6 +169,10 @@
         document.getElementById("role-" + r).classList.add("sel");
       }
 
+      function mostrarAvisoRecuperacion() {
+        document.getElementById("fgtMsg").classList.toggle("show");
+      }
+
       async function doLogin() {
         const usuario = document.getElementById("lUser").value.trim();
         const contrasena = document.getElementById("lPass").value;
@@ -195,7 +203,11 @@
 
           if (!res.ok) {
             const data = await res.json().catch(() => ({}));
-            msg.textContent = data.error || "Usuario, contraseña o rol incorrecto.";
+            if (res.status === 429) {
+              msg.textContent = "Demasiados intentos. Espera un minuto antes de volver a intentar.";
+            } else {
+              msg.textContent = data.error || "Usuario, contraseña o rol incorrecto.";
+            }
             err.classList.add("show");
             if (window.yetiReact) yetiReact(false);
             return;

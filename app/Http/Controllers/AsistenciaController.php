@@ -3,17 +3,36 @@ namespace App\Http\Controllers;
 
 use App\Models\Asistencia;
 use App\Models\Estudiante;
+use App\Models\Horario;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Carbon\Carbon;
 
 class AsistenciaController extends Controller {
 
-    // Mostrar todas las asistencias (API)
+    // Mostrar las asistencias (API).
+    // Si quien pregunta es un estudiante, SOLO ve sus propios registros —
+    // el filtro pasa aquí, en el servidor, no en el navegador. Antes, el
+    // navegador recibía la asistencia de todos los estudiantes y solo
+    // escondía visualmente lo que no correspondía, lo cual no protegía nada.
     public function index() {
-        $asistencias = Asistencia::orderBy('fecha', 'desc')
-                                  ->orderBy('hora', 'desc')
-                                  ->get();
-        return response()->json($asistencias);
+        $query = Asistencia::orderBy('fecha', 'desc')->orderBy('hora', 'desc');
+
+        $usuario = Auth::user();
+        if ($usuario && $usuario->rol === 'estudiante') {
+            // Si la cuenta de estudiante no está vinculada a ningún
+            // estudiante real todavía, no se le muestra nada (mejor eso
+            // que mostrar todo por accidente).
+            $query->where('estudiante_id', $usuario->estudiante_id ?? 0);
+        } elseif ($usuario && $usuario->rol === 'docente') {
+            // Un docente solo ve la asistencia de los grados que tiene
+            // asignados (tabla pivote docente_grado). Si no tiene ningún
+            // grado asignado todavía, no ve nada, no todo por accidente.
+            $nombresGrados = $usuario->grados()->pluck('grados.nombre');
+            $query->whereIn('grado', $nombresGrados->isNotEmpty() ? $nombresGrados : ['__ninguno__']);
+        }
+
+        return response()->json($query->get());
     }
 
     // Registrar asistencia manual (desde el panel)
@@ -111,10 +130,22 @@ class AsistenciaController extends Controller {
             ]);
         }
 
-        // Determinar estado según la hora (hora límite: 7:10 AM)
+        // Determinar estado según la hora límite configurada para el
+        // grado del estudiante (tabla horarios). Antes este valor estaba
+        // fijo en el código (7:10 a.m.) para todos los grados por igual.
         $horaActual = now();
-        $horaLimite = now()->setTime(7, 10, 0);
-        $estado = $horaActual > $horaLimite ? 'Retardo' : 'Presente';
+        $horario = Horario::where('grado_id', $estudiante->grado_id)->first();
+
+        if ($horario && $horario->hora_limite) {
+            $horaLimite = Carbon::parse($hoy . ' ' . $horario->hora_limite);
+        } else {
+            // Si ese grado todavía no tiene un horario configurado,
+            // usamos 7:10 a.m. como valor por defecto razonable, en vez
+            // de fallar o dejar pasar el registro sin ningún control.
+            $horaLimite = Carbon::parse($hoy . ' 07:10:00');
+        }
+
+        $estado = $horaActual->gt($horaLimite) ? 'Retardo' : 'Presente';
 
         // Crear registro de asistencia
         $asistencia = Asistencia::create([

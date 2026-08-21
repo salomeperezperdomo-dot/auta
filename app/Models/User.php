@@ -24,6 +24,7 @@ class User extends Authenticatable
         'email',
         'password',
         'rol',
+        'estudiante_id',
     ];
 
     /**
@@ -47,5 +48,21 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
         ];
+    }
+
+    // Solo tiene valor cuando rol = 'estudiante': es SU fila real en la
+    // tabla estudiantes, la que permite filtrar "Mi Asistencia" en el servidor.
+    public function estudiante()
+    {
+        return $this->belongsTo(Estudiante::class);
+    }
+
+    // Solo aplica cuando rol = 'docente': los grados en los que da clase.
+    // Es una relación muchos-a-muchos real (un docente puede tener varios
+    // grados, un grado puede tener varios docentes), por eso usa la tabla
+    // pivote docente_grado en vez de una llave foránea directa.
+    public function grados()
+    {
+        return $this->belongsToMany(Grado::class, 'docente_grado');
     }
 }

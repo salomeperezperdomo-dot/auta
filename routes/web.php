@@ -7,13 +7,16 @@ use App\Http\Controllers\GradoController;
 use App\Http\Controllers\GrupoController;
 use App\Http\Controllers\HorarioController;
 use App\Models\Estudiante;
+use App\Http\Controllers\ReporteAsistenciaController;
 
 // ══════════════════════════════════════════════════════
 // RUTAS PÚBLICAS (no requieren haber iniciado sesión)
 // ══════════════════════════════════════════════════════
 Route::get('/', function () { return view('index'); });
 Route::get('/login', function () { return view('login'); })->name('login');
-Route::post('/api/login', [UsuarioController::class, 'login']);
+// Máximo 5 intentos de login por minuto (por IP) — protección básica contra
+// fuerza bruta. Si se exceden, Laravel responde 429 automáticamente.
+Route::post('/api/login', [UsuarioController::class, 'login'])->middleware('throttle:5,1');
 
 // ══════════════════════════════════════════════════════
 // RUTAS PROTEGIDAS (requieren sesión iniciada, cualquier rol)
@@ -70,4 +73,6 @@ Route::middleware('auth')->group(function () {
         Route::put('/horarios/{horario}', [HorarioController::class, 'update']);
         Route::delete('/horarios/{horario}', [HorarioController::class, 'destroy']);
     });
+        Route::get('/reporte/grupo/{grupo}/pdf', [ReporteAsistenciaController::class, 'exportarPdf'])
+         ->name('reporte.asistencia.pdf');
 });

@@ -8,7 +8,12 @@ class GradoController extends Controller
 {
     /* READ: listar todos los grados */
     public function index() {
-        $grados = Grado::all();
+        // num_estudiantes se calcula en vivo (conteo real de la relación),
+        // no se confía en la columna guardada — esa nunca se actualizaba
+        // cuando se creaba, movía o eliminaba un estudiante, así que
+        // mostraba un número desactualizado.
+        $grados = Grado::withCount('estudiantes')->get();
+        $grados->each(fn($g) => $g->num_estudiantes = $g->estudiantes_count);
         return response()->json($grados);
     }
 
@@ -19,21 +24,22 @@ class GradoController extends Controller
             'descripcion' => 'nullable|string|max:100',
         ]);
 
-        $grado = Grado::create($request->all());
+        $grado = Grado::create($request->only(['nombre', 'descripcion']));
 
         return response()->json($grado, 201);
     }
 
     /* READ: ver un grado específico */
     public function show($id) {
-        $grado = Grado::findOrFail($id);
+        $grado = Grado::withCount('estudiantes')->findOrFail($id);
+        $grado->num_estudiantes = $grado->estudiantes_count;
         return response()->json($grado);
     }
 
     /* UPDATE: editar un grado */
     public function update(Request $request, $id) {
         $grado = Grado::findOrFail($id);
-        $grado->update($request->all());
+        $grado->update($request->only(['nombre', 'descripcion']));
         return response()->json($grado);
     }
 

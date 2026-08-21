@@ -7,12 +7,13 @@ return new class extends Migration {
     public function up() {
         Schema::create('grupos', function (Blueprint $table) {
             $table->id();
-            $table->string('nombre', 20);   // Ej: "6°1", "6°2", "7°1"
             $table->foreignId('grado_id')->constrained('grados');
+            $table->unsignedTinyInteger('numero');   // 1, 2, 3... (seleccionado de una lista, nunca escrito a mano)
+            $table->string('nombre', 20);            // Se arma solo: nombre del grado + numero (ej: "6°" + "1" = "6°1")
             $table->timestamps();
 
-            // No puede haber dos grupos con el mismo nombre dentro del mismo grado
-            $table->unique(['grado_id', 'nombre']);
+            // No puede haber dos grupos con el mismo número dentro del mismo grado
+            $table->unique(['grado_id', 'numero']);
         });
     }
     public function down() {

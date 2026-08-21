@@ -56,7 +56,7 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         // ======================================================
-        // 1. RECUPERAR SESIÓN
+        // 1.RECUPERAR SESIÓN
         // ======================================================
         const _user = sessionStorage.getItem("auta_user") || "admin";
         const _roleLabel = sessionStorage.getItem("auta_role") || "Administrador";
@@ -124,6 +124,10 @@
                         <span class="psb-ic"><i class="fas fa-layer-group"></i></span>
                         Grados
                     </button>
+                    <button class="psb-btn" onclick="mostrarVista('grupos')">
+                        <span class="psb-ic"><i class="fas fa-users"></i></span>
+                        Grupos
+                    </button>
                     <button class="psb-btn" onclick="mostrarVista('horarios')">
                         <span class="psb-ic"><i class="fas fa-clock"></i></span>
                         Horarios
@@ -184,6 +188,9 @@
                 } else if (vista === "grados") {
                     document.getElementById("pTopTitle").textContent = "Grados";
                     cargarGradosAdmin();
+                } else if (vista === "grupos") {
+                    document.getElementById("pTopTitle").textContent = "Grupos";
+                    cargarGruposAdmin();
                 } else if (vista === "horarios") {
                     document.getElementById("pTopTitle").textContent = "Horarios";
                     cargarHorariosAdmin();
@@ -213,11 +220,15 @@
             document.getElementById("contenido-dinamico").innerHTML = html;
 
             try {
+                // El servidor ya filtra esto: si quien está autenticado es un
+                // estudiante, /api/asistencia solo devuelve SUS registros.
+                // (Antes se pedían todos y se filtraban aquí por nombre, lo
+                // cual además de no funcionar bien, exponía la asistencia de
+                // todo el colegio a cualquier cuenta de estudiante.)
                 const res = await fetch("/api/asistencia");
-                const data = await res.json();
-                const misAsistencias = data.filter(a => a.nombre === _user || a.nombre.toLowerCase() === _user.toLowerCase());
+                const misAsistencias = await res.json();
                 const tbody = document.getElementById("estudiante-tbody");
-                
+
                 if (misAsistencias.length === 0) {
                     tbody.innerHTML = `<tr><td colspan="4"><div class="empty-st">No tienes registros de asistencia aún.</div></td></tr>`;
                     return;
@@ -775,6 +786,11 @@
                             </select>
                             <input type="date" class="pinp" id="reg-filtro-fecha" title="Filtrar por fecha" style="min-width:160px;background:rgba(255,255,255,0.05)" onchange="resetPagina('reg');renderRegistrosAdminFiltrado()" />
                             <button class="act-btn" title="Limpiar filtros" onclick="limpiarFiltros('reg', renderRegistrosAdminFiltrado)"><i class="fas fa-times"></i> Limpiar</button>
+                             <!-- BOTÓN PDF AQUÍ -->
+                    <button class="btn-pdf" onclick="exportarReporteAdminPDF()" style="background: #e74c3c; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: bold; display: inline-flex; align-items: center; gap: 6px;">
+                        <i class="fas fa-file-pdf"></i> Exportar PDF
+                    </button>
+                    <!-- FIN BOTÓN -->
                         </div>
                     </div>
                     <div class="tbl-wrap"><table class="rtbl"><thead><tr>${thOrdenable('reg','id','ID','renderRegistrosAdminFiltrado')}${thOrdenable('reg','nombre','Estudiante','renderRegistrosAdminFiltrado')}${thOrdenable('reg','grado','Grado','renderRegistrosAdminFiltrado')}${thOrdenable('reg','fecha','Fecha','renderRegistrosAdminFiltrado')}${thOrdenable('reg','hora','Hora','renderRegistrosAdminFiltrado')}${thOrdenable('reg','estado','Estado','renderRegistrosAdminFiltrado')}<th>Acciones</th></tr></thead><tbody id="reg-tbody-admin"></tbody></table></div>
@@ -784,6 +800,45 @@
             document.getElementById("contenido-dinamico").innerHTML = html;
             cargarTablaRegistrosAdmin();
         }
+
+        // ======================================================
+// EXPORTAR REPORTE EN PDF (Admin)
+// ======================================================
+// Reemplaza tu función actual por esta:
+function exportarReporteAdminPDF() {
+    // Filtra los datos con los mismos filtros actuales
+    const busqueda = normalizarTexto(document.getElementById('reg-buscar')?.value);
+    const grado = document.getElementById('reg-filtro-grado')?.value || '';
+    const fecha = document.getElementById('reg-filtro-fecha')?.value || '';
+
+    const dataFiltrada = _regAdminData.filter(a => {
+        const coincideBusqueda = !busqueda || normalizarTexto(a.nombre).includes(busqueda);
+        const coincideGrado = !grado || a.grado === grado;
+        const coincideFecha = !fecha || a.fecha === fecha;
+        return coincideBusqueda && coincideGrado && coincideFecha;
+    });
+
+    if (dataFiltrada.length === 0) {
+        mostrarToast('No hay datos para exportar.', 'error');
+        return;
+    }
+
+    // Usar window.print() o una librería como jsPDF. 
+    // Aquí un ejemplo simple abriendo una ventana con una tabla imprimible:
+    const w = window.open('', '_blank');
+    w.document.write(`
+        <html><head><title>Reporte de Asistencia</title>
+        <style>body{font-family:Arial}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:8px;text-align:left}th{background:#f0f0f0}</style>
+        </head><body>
+        <h2>Reporte de Asistencia</h2>
+        <p>Filtros: Grado: ${grado || 'Todos'} | Fecha: ${fecha || 'Todas'}</p>
+        <table><thead><tr><th>ID</th><th>Nombre</th><th>Grado</th><th>Fecha</th><th>Hora</th><th>Estado</th></tr></thead><tbody>
+        ${dataFiltrada.map(a => `<tr><td>${a.id}</td><td>${a.nombre}</td><td>${a.grado}</td><td>${a.fecha}</td><td>${a.hora}</td><td>${a.estado}</td></tr>`).join('')}
+        </tbody></table></body></html>
+    `);
+    w.document.close();
+    w.print(); // Esto abre el diálogo de guardar/imprimir como PDF
+}
 
         // ======================================================
         // 7. VISTA ADMIN: GRADOS (CRUD)
@@ -926,7 +981,217 @@
         };
 
         // ======================================================
-        // 8. VISTA ADMIN: HORARIOS (CRUD)
+        // 8. VISTA ADMIN: GRUPOS (CRUD)
+        //    Selección en cascada: primero Grado, después Número de
+        //    grupo. El número NO tiene un tope fijo en el código —
+        //    es un campo numérico abierto (para poder crear el grupo
+        //    5, 10, o el que se necesite en el futuro sin tocar nada
+        //    aquí), pero al elegir el grado se sugiere automáticamente
+        //    el siguiente número disponible. El nombre final (ej:
+        //    "6°1") lo arma el servidor solo, para que nadie lo escriba
+        //    distinto.
+        // ======================================================
+        function cargarGruposAdmin() {
+            const html = `
+                <div class="p-card">
+                    <div class="p-card-hd"><h6><i class="fas fa-plus-circle" style="margin-right: 0.4rem; color: var(--accent2);"></i>Nuevo Grupo</h6></div>
+                    <div class="p-card-bd">
+                        <div class="form-grid">
+                            <div><label class="flbl2">Grado</label>
+                                <select class="pinp" id="gr-grado" style="background:rgba(255,255,255,0.05)" onchange="sugerirSiguienteNumero()">
+                                    <option value="">Cargando grados…</option>
+                                </select>
+                            </div>
+                            <div><label class="flbl2">Número de grupo</label>
+                                <input type="number" class="pinp" id="gr-numero" min="1" step="1" placeholder="Selecciona un grado primero" oninput="actualizarPreviewGrupo()" />
+                            </div>
+                            <div><label class="flbl2">Vista previa</label><input type="text" class="pinp" id="gr-preview" readonly placeholder="Ej: 6°1" /></div>
+                            <div style="display:flex;align-items:flex-end"><button class="btn-add" onclick="agregarGrupo()"><i class="fas fa-plus"></i> Agregar</button></div>
+                        </div>
+                        <div style="font-size:0.8rem;opacity:0.65;margin-top:0.35rem;">El número se sugiere solo (el siguiente disponible para ese grado), pero puedes escribir el que necesites.</div>
+                    </div>
+                </div>
+                <div class="p-card">
+                    <div class="p-card-hd"><h6><i class="fas fa-users" style="margin-right: 0.4rem; color: var(--blue-light);"></i>Grupos registrados</h6></div>
+                    <div class="tbl-wrap"><table class="rtbl"><thead><tr><th>Grado</th><th>Número</th><th>Nombre</th><th>Acciones</th></tr></thead><tbody id="grupos-tbody"></tbody></table></div>
+                </div>
+            `;
+            document.getElementById("contenido-dinamico").innerHTML = html;
+            cargarGruposData().then(() => cargarGradosParaSelectGrupo());
+        }
+
+        let _gruposData = [];
+        let _gradosParaGrupo = [];
+
+        async function cargarGradosParaSelectGrupo() {
+            const select = document.getElementById("gr-grado");
+            if (!select) return;
+            try {
+                const res = await fetch("/grados", { headers: { "Accept": "application/json" } });
+                _gradosParaGrupo = await res.json();
+                if (!_gradosParaGrupo.length) {
+                    select.innerHTML = `<option value="">Primero crea un grado</option>`;
+                    return;
+                }
+                const ordenados = [..._gradosParaGrupo].sort((a, b) => (a.nombre || "").localeCompare(b.nombre || "", "es", { numeric: true }));
+                select.innerHTML = `<option value="">Selecciona un grado</option>` +
+                    ordenados.map(g => `<option value="${g.id}">${g.nombre}</option>`).join("");
+            } catch(e) {
+                console.error(e);
+                select.innerHTML = `<option value="">Error al cargar grados</option>`;
+            }
+        }
+
+        // Al elegir un grado, sugiere el siguiente número libre (el mayor
+        // que ya exista para ese grado, +1). Si el grado no tiene grupos
+        // todavía, sugiere 1. Siempre se puede sobrescribir a mano.
+        function sugerirSiguienteNumero() {
+            const gradoId = Number(document.getElementById("gr-grado")?.value);
+            const numeroInput = document.getElementById("gr-numero");
+            if (!numeroInput) return;
+            if (!gradoId) {
+                numeroInput.placeholder = "Selecciona un grado primero";
+                actualizarPreviewGrupo();
+                return;
+            }
+            const numerosExistentes = _gruposData
+                .filter(g => g.grado_id === gradoId)
+                .map(g => g.numero);
+            const siguiente = numerosExistentes.length ? Math.max(...numerosExistentes) + 1 : 1;
+            numeroInput.value = siguiente;
+            numeroInput.placeholder = "";
+            actualizarPreviewGrupo();
+        }
+
+        function actualizarPreviewGrupo() {
+            const gradoSelect = document.getElementById("gr-grado");
+            const numero = document.getElementById("gr-numero")?.value;
+            const preview = document.getElementById("gr-preview");
+            if (!gradoSelect || !preview) return;
+            const nombreGrado = gradoSelect.selectedOptions[0]?.textContent || "";
+            preview.value = (gradoSelect.value && numero) ? (nombreGrado + numero) : "";
+        }
+
+        async function cargarGruposData() {
+            try {
+                const res = await fetch("/grupos", { headers: { "Accept": "application/json" } });
+                _gruposData = await res.json();
+                renderGruposTabla();
+            } catch(e) { console.error(e); mostrarToast("No se pudieron cargar los grupos.", "error"); }
+        }
+
+        function renderGruposTabla() {
+            const tbody = document.getElementById("grupos-tbody");
+            if (!tbody) return;
+            if (_gruposData.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="4"><div class="empty-st">No hay grupos registrados todavía.</div></td></tr>`;
+                return;
+            }
+            tbody.innerHTML = _gruposData.map(g => `
+                <tr id="grupo-row-${g.id}">
+                    <td>${g.grado?.nombre ?? "—"}</td>
+                    <td>${g.numero}</td>
+                    <td>${g.nombre}</td>
+                    <td>
+                        <div class="act-btns">
+                            <button class="act-btn edit" onclick="editarGrupo(${g.id})" title="Editar"><i class="fas fa-pen"></i></button>
+                            <button class="act-btn del"  onclick="eliminarGrupo(${g.id})" title="Eliminar"><i class="fas fa-trash"></i></button>
+                        </div>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        window.agregarGrupo = async function() {
+            const grado_id = document.getElementById("gr-grado")?.value;
+            const numero = document.getElementById("gr-numero")?.value;
+            if (!grado_id || !numero) { mostrarToast("Selecciona el grado y el número de grupo.", "error"); return; }
+            try {
+                const res = await fetch("/grupos", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Accept": "application/json",
+                        "X-CSRF-TOKEN": document.querySelector('meta[name="csrf-token"]').content
+                    },
+                    body: JSON.stringify({ grado_id, numero })
+                });
+                if (!res.ok) {
+                    const errData = await res.json().catch(() => ({}));
+                    const mensaje = errData.message || (errData.errors ? Object.values(errData.errors).flat().join(" ") : "No se pudo crear el grupo.");
+                    mostrarToast(mensaje, "error");
+                    return;
+                }
+                document.getElementById("gr-grado").value = "";
+                document.getElementById("gr-numero").value = "";
+                document.getElementById("gr-preview").value = "";
+                cargarGruposData();
+                mostrarToast("Grupo agregado correctamente.");
+            } catch(e) { mostrarToast("Error de conexión: " + e.message, "error"); }
+        };
+
+        window.editarGrupo = function(id) {
+            const row = document.getElementById("grupo-row-" + id);
+            const g = _gruposData.find(x => x.id === id);
+            if (!row || !g) return;
+
+            const opcionesGrado = [..._gradosParaGrupo]
+                .sort((a, b) => (a.nombre || "").localeCompare(b.nombre || "", "es", { numeric: true }))
+                .map(gr => `<option value="${gr.id}" ${gr.id === g.grado_id ? "selected" : ""}>${gr.nombre}</option>`).join("");
+
+            row.innerHTML =
+                "<td><select class='pinp' id='ge-grado-" + id + "'>" + opcionesGrado + "</select></td>" +
+                "<td><input type='number' class='pinp' id='ge-numero-" + id + "' min='1' step='1' value='" + g.numero + "' /></td>" +
+                "<td>" + g.nombre + " <span style='opacity:.6;font-size:.75rem;'>(se recalcula al guardar)</span></td>" +
+                "<td><div class='act-btns'>" +
+                    "<button class='act-btn edit' onclick='guardarEdicionGrupo(" + id + ")' title='Guardar'><i class='fas fa-check'></i></button>" +
+                    "<button class='act-btn del'  onclick='renderGruposTabla()' title='Cancelar'><i class='fas fa-times'></i></button>" +
+                "</div></td>";
+        };
+
+        window.guardarEdicionGrupo = async function(id) {
+            const grado_id = document.getElementById("ge-grado-" + id)?.value;
+            const numero = document.getElementById("ge-numero-" + id)?.value;
+            if (!grado_id || !numero) { mostrarToast("Selecciona el grado y el número de grupo.", "error"); return; }
+            try {
+                const res = await fetch("/grupos/" + id, {
+                    method: "PUT",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Accept": "application/json",
+                        "X-CSRF-TOKEN": document.querySelector('meta[name="csrf-token"]').content
+                    },
+                    body: JSON.stringify({ grado_id, numero })
+                });
+                if (!res.ok) {
+                    const errData = await res.json().catch(() => ({}));
+                    mostrarToast(errData.message || "No se pudo guardar el grupo.", "error");
+                    return;
+                }
+                await cargarGruposData();
+                mostrarToast("Grupo actualizado correctamente.");
+            } catch(e) { mostrarToast("Error de conexión: " + e.message, "error"); }
+        };
+
+        window.eliminarGrupo = async function(id) {
+            if (!confirm("¿Eliminar este grupo? Los estudiantes asignados a él podrían quedar huérfanos.")) return;
+            try {
+                const res = await fetch("/grupos/" + id, {
+                    method: "DELETE",
+                    headers: { "Accept": "application/json", "X-CSRF-TOKEN": document.querySelector('meta[name="csrf-token"]').content }
+                });
+                if (!res.ok) {
+                    const errData = await res.json().catch(() => ({}));
+                    mostrarToast(errData.message || "No se pudo eliminar el grupo.", "error");
+                    return;
+                }
+                cargarGruposData();
+                mostrarToast("Grupo eliminado correctamente.");
+            } catch(e) { mostrarToast("Error de conexión: " + e.message, "error"); }
+        };
+
+        // ======================================================
+        // 9. VISTA ADMIN: HORARIOS (CRUD)
         // ======================================================
         function cargarHorariosAdmin() {
             const html = `
@@ -1097,7 +1362,7 @@
         };
 
         // ======================================================
-        // 9. LOGOUT Y INICIALIZACIÓN
+        // 10. LOGOUT Y INICIALIZACIÓN
         // ======================================================
         async function doLogout() {
             try {

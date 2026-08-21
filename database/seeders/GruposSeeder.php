@@ -18,8 +18,8 @@ class GruposSeeder extends Seeder
         foreach ($grados as $grado) {
             foreach ([1, 2] as $numero) {
                 Grupo::updateOrCreate(
-                    ['grado_id' => $grado->id, 'nombre' => $grado->nombre . $numero],
-                    []
+                    ['grado_id' => $grado->id, 'numero' => $numero],
+                    ['nombre' => $grado->nombre . $numero]
                 );
             }
         }

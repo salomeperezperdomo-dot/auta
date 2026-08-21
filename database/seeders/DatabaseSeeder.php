@@ -20,10 +20,10 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         $this->call([
-            UsuariosSeeder::class,
             GradosSeeder::class,
             GruposSeeder::class,
             EstudiantesSeeder::class,
+            UsuariosSeeder::class,
         ]);
     }
 }

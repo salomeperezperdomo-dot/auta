@@ -34,14 +34,5 @@ class UsuariosSeeder extends Seeder
                 ]
             );
         }
-
-        // La cuenta demo de docente queda asignada a los grados donde hay
-        // estudiantes de prueba (9°, 10°, 11°), para que sus reportes no
-        // se vean vacíos. sync() es idempotente: no duplica si se repite.
-        $docenteDemo = User::where('usuario', 'docente')->first();
-        if ($docenteDemo) {
-            $gradosAsignados = \App\Models\Grado::whereIn('nombre', ['9°', '10°', '11°'])->pluck('id');
-            $docenteDemo->grados()->sync($gradosAsignados);
-        }
     }
 }

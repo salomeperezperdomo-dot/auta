@@ -24,13 +24,9 @@ class AsistenciaController extends Controller {
             // estudiante real todavía, no se le muestra nada (mejor eso
             // que mostrar todo por accidente).
             $query->where('estudiante_id', $usuario->estudiante_id ?? 0);
-        } elseif ($usuario && $usuario->rol === 'docente') {
-            // Un docente solo ve la asistencia de los grados que tiene
-            // asignados (tabla pivote docente_grado). Si no tiene ningún
-            // grado asignado todavía, no ve nada, no todo por accidente.
-            $nombresGrados = $usuario->grados()->pluck('grados.nombre');
-            $query->whereIn('grado', $nombresGrados->isNotEmpty() ? $nombresGrados : ['__ninguno__']);
         }
+        // El docente ve todos los registros, sin restricción por grado —
+        // es la política intencional del proyecto, no un descuido.
 
         return response()->json($query->get());
     }

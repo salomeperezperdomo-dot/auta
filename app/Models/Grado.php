@@ -22,10 +22,4 @@ class Grado extends Model
     public function horario() {
         return $this->hasOne(Horario::class);
     }
-
-    // Un grado tiene muchos docentes asignados (y un docente puede tener
-    // varios grados) — relación muchos-a-muchos real, vía docente_grado.
-    public function docentes() {
-        return $this->belongsToMany(User::class, 'docente_grado');
-    }
 }

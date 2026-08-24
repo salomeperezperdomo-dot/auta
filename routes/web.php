@@ -72,7 +72,10 @@ Route::middleware('auth')->group(function () {
         Route::post('/horarios', [HorarioController::class, 'store']);
         Route::put('/horarios/{horario}', [HorarioController::class, 'update']);
         Route::delete('/horarios/{horario}', [HorarioController::class, 'destroy']);
+
+        // Exportar el reporte de asistencia a PDF (mismos filtros que la
+        // tabla en pantalla: buscar, grado, fecha).
+        Route::get('/reporte/asistencia/pdf', [ReporteAsistenciaController::class, 'exportarAdminPdf'])
+            ->name('reporte.asistencia.pdf');
     });
-        Route::get('/reporte/grupo/{grupo}/pdf', [ReporteAsistenciaController::class, 'exportarPdf'])
-         ->name('reporte.asistencia.pdf');
 });

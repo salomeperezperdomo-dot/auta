@@ -614,7 +614,7 @@
             renderControlesPaginacion("reg", info, "renderRegistrosAdminFiltrado");
 
             if (info.pageData.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="7"><div class="empty-st">No hay registros que coincidan con la búsqueda.</div></td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="8"><div class="empty-st">No hay registros que coincidan con la búsqueda.</div></td></tr>`;
                 return;
             }
             tbody.innerHTML = info.pageData.map(a => `
@@ -625,6 +625,7 @@
                     <td>${a.fecha}</td>
                     <td>${a.hora}</td>
                     <td><span class="badge ${a.estado === 'Presente' ? 'presente' : a.estado === 'Retardo' ? 'retardo' : 'ausente'}">${a.estado}</span></td>
+                    <td>${a.grupo ?? '—'}</td>
                     <td>
                         <div class="act-btns">
                             <button class="act-btn edit" onclick="editarRegistroAdmin(${a.id})" title="Editar"><i class="fas fa-pen"></i></button>
@@ -701,6 +702,7 @@
             const fecha  = celdas[3].textContent.trim();
             const hora   = celdas[4].textContent.trim().slice(0,5);
             const estado = celdas[5].querySelector(".badge")?.textContent.trim() || "Presente";
+            const grupo  = celdas[6].textContent.trim();
             row.innerHTML =
                 "<td>" + id + "</td>" +
                 "<td><input type='text' class='pinp' id='re-nombre-" + id + "' value='" + nombre.replace(/'/g,"&#39;") + "' /></td>" +
@@ -712,6 +714,7 @@
                     "<option value='Ausente'"  + (estado==='Ausente' ?' selected':'') + ">Ausente</option>"  +
                     "<option value='Retardo'"  + (estado==='Retardo' ?' selected':'') + ">Retardo</option>"  +
                 "</select></td>" +
+                "<td>" + grupo + " <span style='opacity:.6;font-size:.75rem;'>(no editable aquí)</span></td>" +
                 "<td><div class='act-btns'>" +
                     "<button class='act-btn edit' onclick='guardarEdicionRegistroAdmin(" + id + ")' title='Guardar'><i class='fas fa-check'></i></button>" +
                     "<button class='act-btn del'  onclick='cargarTablaRegistrosAdmin()'             title='Cancelar'><i class='fas fa-times'></i></button>" +
@@ -793,7 +796,7 @@
                     <!-- FIN BOTÓN -->
                         </div>
                     </div>
-                    <div class="tbl-wrap"><table class="rtbl"><thead><tr>${thOrdenable('reg','id','ID','renderRegistrosAdminFiltrado')}${thOrdenable('reg','nombre','Estudiante','renderRegistrosAdminFiltrado')}${thOrdenable('reg','grado','Grado','renderRegistrosAdminFiltrado')}${thOrdenable('reg','fecha','Fecha','renderRegistrosAdminFiltrado')}${thOrdenable('reg','hora','Hora','renderRegistrosAdminFiltrado')}${thOrdenable('reg','estado','Estado','renderRegistrosAdminFiltrado')}<th>Acciones</th></tr></thead><tbody id="reg-tbody-admin"></tbody></table></div>
+                    <div class="tbl-wrap"><table class="rtbl"><thead><tr>${thOrdenable('reg','id','ID','renderRegistrosAdminFiltrado')}${thOrdenable('reg','nombre','Estudiante','renderRegistrosAdminFiltrado')}${thOrdenable('reg','grado','Grado','renderRegistrosAdminFiltrado')}${thOrdenable('reg','fecha','Fecha','renderRegistrosAdminFiltrado')}${thOrdenable('reg','hora','Hora','renderRegistrosAdminFiltrado')}${thOrdenable('reg','estado','Estado','renderRegistrosAdminFiltrado')}${thOrdenable('reg','grupo','Grupo','renderRegistrosAdminFiltrado')}<th>Acciones</th></tr></thead><tbody id="reg-tbody-admin"></tbody></table></div>
                     <div id="reg-paginacion" style="padding:0 1rem;"></div>
                 </div>
             `;
@@ -804,40 +807,20 @@
         // ======================================================
 // EXPORTAR REPORTE EN PDF (Admin)
 // ======================================================
-// Reemplaza tu función actual por esta:
+// Genera el PDF de verdad en el servidor (con Spatie\LaravelPdf), con los
+// mismos filtros que están activos en la tabla en pantalla. Antes esto
+// abría una ventana de impresión del navegador; ahora descarga un PDF real.
 function exportarReporteAdminPDF() {
-    // Filtra los datos con los mismos filtros actuales
-    const busqueda = normalizarTexto(document.getElementById('reg-buscar')?.value);
+    const busqueda = document.getElementById('reg-buscar')?.value || '';
     const grado = document.getElementById('reg-filtro-grado')?.value || '';
     const fecha = document.getElementById('reg-filtro-fecha')?.value || '';
 
-    const dataFiltrada = _regAdminData.filter(a => {
-        const coincideBusqueda = !busqueda || normalizarTexto(a.nombre).includes(busqueda);
-        const coincideGrado = !grado || a.grado === grado;
-        const coincideFecha = !fecha || a.fecha === fecha;
-        return coincideBusqueda && coincideGrado && coincideFecha;
-    });
+    const params = new URLSearchParams();
+    if (busqueda) params.set('buscar', busqueda);
+    if (grado) params.set('grado', grado);
+    if (fecha) params.set('fecha', fecha);
 
-    if (dataFiltrada.length === 0) {
-        mostrarToast('No hay datos para exportar.', 'error');
-        return;
-    }
-
-    // Usar window.print() o una librería como jsPDF. 
-    // Aquí un ejemplo simple abriendo una ventana con una tabla imprimible:
-    const w = window.open('', '_blank');
-    w.document.write(`
-        <html><head><title>Reporte de Asistencia</title>
-        <style>body{font-family:Arial}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:8px;text-align:left}th{background:#f0f0f0}</style>
-        </head><body>
-        <h2>Reporte de Asistencia</h2>
-        <p>Filtros: Grado: ${grado || 'Todos'} | Fecha: ${fecha || 'Todas'}</p>
-        <table><thead><tr><th>ID</th><th>Nombre</th><th>Grado</th><th>Fecha</th><th>Hora</th><th>Estado</th></tr></thead><tbody>
-        ${dataFiltrada.map(a => `<tr><td>${a.id}</td><td>${a.nombre}</td><td>${a.grado}</td><td>${a.fecha}</td><td>${a.hora}</td><td>${a.estado}</td></tr>`).join('')}
-        </tbody></table></body></html>
-    `);
-    w.document.close();
-    w.print(); // Esto abre el diálogo de guardar/imprimir como PDF
+    window.open('/reporte/asistencia/pdf?' + params.toString(), '_blank');
 }
 
         // ======================================================

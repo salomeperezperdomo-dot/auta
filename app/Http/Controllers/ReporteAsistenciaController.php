@@ -11,7 +11,7 @@ class ReporteAsistenciaController extends Controller
     public function exportarAdminPdf(Request $request)
     {
         // Construir la consulta con los filtros
-        $query = Asistencia::with('estudiante');
+        $query = Asistencia::with('estudiante.grupo');
         
         if ($request->filled('buscar')) {
             $query->whereHas('estudiante', function ($q) use ($request) {

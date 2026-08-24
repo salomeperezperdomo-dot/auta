@@ -97,6 +97,7 @@
                 <th>#</th>
                 <th>Estudiante</th>
                 <th>Grado</th>
+                <th>Grupo</th>
                 <th>Fecha</th>
                 <th>Hora</th>
                 <th>Estado</th>
@@ -108,13 +109,14 @@
                 <td>{{ $index + 1 }}</td>
                 <td>{{ $a->estudiante->nombre ?? 'N/A' }}</td>
                 <td>{{ $a->grado }}</td>
+                <td>{{ $a->estudiante->grupo->nombre ?? '—' }}</td>
                 <td>{{ \Carbon\Carbon::parse($a->fecha)->format('d/m/Y') }}</td>
                 <td>{{ \Carbon\Carbon::parse($a->hora)->format('h:i A') }}</td>
                 <td class="{{ strtolower($a->estado) }}">{{ $a->estado }}</td>
             </tr>
             @empty
             <tr>
-                <td colspan="6" style="text-align: center;">No hay registros con los filtros aplicados</td>
+                <td colspan="7" style="text-align: center;">No hay registros con los filtros aplicados</td>
             </tr>
             @endforelse
         </tbody>

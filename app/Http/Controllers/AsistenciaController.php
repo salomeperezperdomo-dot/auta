@@ -16,7 +16,7 @@ class AsistenciaController extends Controller {
     // navegador recibía la asistencia de todos los estudiantes y solo
     // escondía visualmente lo que no correspondía, lo cual no protegía nada.
     public function index() {
-        $query = Asistencia::orderBy('fecha', 'desc')->orderBy('hora', 'desc');
+        $query = Asistencia::with('estudiante.grupo')->orderBy('fecha', 'desc')->orderBy('hora', 'desc');
 
         $usuario = Auth::user();
         if ($usuario && $usuario->rol === 'estudiante') {
@@ -28,7 +28,20 @@ class AsistenciaController extends Controller {
         // El docente ve todos los registros, sin restricción por grado —
         // es la política intencional del proyecto, no un descuido.
 
-        return response()->json($query->get());
+        // El grupo no se guarda como texto en cada asistencia (a diferencia
+        // del grado, que sí se copia como fotografía histórica) — se toma
+        // en vivo desde el estudiante actual. Si el estudiante cambió de
+        // grupo después de ese registro, esto muestra su grupo de HOY, no
+        // el de ese día. Avísame si prefieres que también quede fijo como
+        // el grado.
+        $asistencias = $query->get()->map(function ($a) {
+            $data = $a->toArray();
+            $data['grupo'] = $a->estudiante?->grupo?->nombre;
+            unset($data['estudiante']);
+            return $data;
+        });
+
+        return response()->json($asistencias);
     }
 
     // Registrar asistencia manual (desde el panel)

@@ -73,9 +73,11 @@ Route::middleware('auth')->group(function () {
         Route::put('/horarios/{horario}', [HorarioController::class, 'update']);
         Route::delete('/horarios/{horario}', [HorarioController::class, 'destroy']);
 
-        // Exportar el reporte de asistencia a PDF (mismos filtros que la
-        // tabla en pantalla: buscar, grado, fecha).
+        // Exportación de reportes a PDF (generado en el servidor con
+        // spatie/laravel-pdf) — solo admin, igual que el resto de la
+        // gestión. Antes esta ruta apuntaba a un método inexistente y
+        // el botón del panel usaba window.print() en su lugar.
         Route::get('/reporte/asistencia/pdf', [ReporteAsistenciaController::class, 'exportarAdminPdf'])
-            ->name('reporte.asistencia.pdf');
+             ->name('reporte.asistencia.pdf');
     });
 });

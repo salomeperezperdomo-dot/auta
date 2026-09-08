@@ -359,6 +359,110 @@
         let html5QrCode;
         let logItems = [];
 
+        // ==========================================================
+        // FILTRO DE CALIDAD — detección heurística de "QR mostrado
+        // desde una pantalla" (celular, computador, foto en pantalla)
+        // ==========================================================
+        // Activa/desactiva el filtro fácilmente. Si durante los ensayos
+        // el carnet físico real se llega a rechazar por error, poner
+        // esto en false mientras se recalibran los umbrales de abajo.
+        const FILTRO_CALIDAD_ACTIVO = true;
+
+        // Poner en true mientras se calibra: muestra en la consola del
+        // navegador (F12 → Console) los valores medidos en cada intento,
+        // para poder ajustar los umbrales con el carnet y un celular reales.
+        const FILTRO_CALIDAD_DEBUG = true;
+
+        // Umbrales de partida — NO están garantizados para su cámara/carnet
+        // específicos. Hay que calibrarlos así: activar FILTRO_CALIDAD_DEBUG,
+        // escanear el carnet físico varias veces y anotar los valores de
+        // varianzaLap y difColorProm que salen en consola; luego escanear el
+        // mismo QR mostrado en la pantalla de un celular y anotar esos valores.
+        // Los umbrales deben quedar en un punto intermedio que nunca rechace
+        // el carnet físico real, pero sí distinga la pantalla.
+        const UMBRAL_VARIANZA_LAPLACIANA = 4000;
+        const UMBRAL_DIFERENCIA_COLOR = 18;
+
+        // Analiza la región central del video (donde debe estar el carnet)
+        // buscando dos señales típicas de una pantalla capturada de cerca
+        // por otra cámara, y que un carnet impreso normalmente no tiene:
+        //
+        // 1) Varianza de alta frecuencia (tipo filtro Laplaciano): la
+        //    rejilla de subpíxeles y el refresco de una pantalla generan
+        //    "ruido" fino (parecido al patrón de muaré) que una superficie
+        //    impresa y enfocada normalmente no produce en la misma medida.
+        //
+        // 2) "Fringing" de color: una pantalla arma el blanco combinando
+        //    subpíxeles rojo, verde y azul por separado, así que en zonas
+        //    que deberían verse neutras (blancos y negros del QR) aparecen
+        //    pequeñas diferencias de color entre canales. El papel o PVC
+        //    impreso no tiene ese efecto.
+        //
+        // Esto es una heurística, no una prueba criminalística: puede
+        // fallar con cámaras de baja calidad, poca luz, o carnets muy
+        // desgastados. Por eso existen los umbrales calibrables arriba.
+        function analizarCalidadImagen(video) {
+            try {
+                const size = 240; // igual al qrbox configurado abajo
+                const vw = video.videoWidth, vh = video.videoHeight;
+                if (!vw || !vh) return { pantalla: false, motivo: 'sin datos de video' };
+
+                const cw = Math.min(size, vw), ch = Math.min(size, vh);
+                const sx = Math.floor((vw - cw) / 2), sy = Math.floor((vh - ch) / 2);
+
+                const canvas = document.createElement('canvas');
+                canvas.width = cw; canvas.height = ch;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(video, sx, sy, cw, ch, 0, 0, cw, ch);
+                const { data } = ctx.getImageData(0, 0, cw, ch);
+
+                // Luminancia en escala de grises
+                const gris = new Float32Array(cw * ch);
+                for (let i = 0, p = 0; i < data.length; i += 4, p++) {
+                    gris[p] = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+                }
+
+                // 1) Varianza Laplaciana (alta frecuencia / textura fina)
+                let sumaLap = 0, sumaLap2 = 0, n = 0;
+                for (let y = 1; y < ch - 1; y++) {
+                    for (let x = 1; x < cw - 1; x++) {
+                        const idx = y * cw + x;
+                        const lap = 4 * gris[idx] - gris[idx - 1] - gris[idx + 1] - gris[idx - cw] - gris[idx + cw];
+                        sumaLap += lap; sumaLap2 += lap * lap; n++;
+                    }
+                }
+                const mediaLap = sumaLap / n;
+                const varianzaLap = (sumaLap2 / n) - (mediaLap * mediaLap);
+
+                // 2) Diferencia de color entre canales (fringing de subpíxeles)
+                let sumaDifColor = 0;
+                for (let i = 0; i < data.length; i += 4) {
+                    const r = data[i], g = data[i + 1], b = data[i + 2];
+                    sumaDifColor += Math.abs(r - g) + Math.abs(g - b) + Math.abs(r - b);
+                }
+                const difColorProm = sumaDifColor / (data.length / 4);
+
+                const sospechaPantalla =
+                    varianzaLap > UMBRAL_VARIANZA_LAPLACIANA &&
+                    difColorProm > UMBRAL_DIFERENCIA_COLOR;
+
+                if (FILTRO_CALIDAD_DEBUG) {
+                    console.log(
+                        `[Filtro de calidad] varianzaLap=${varianzaLap.toFixed(0)} ` +
+                        `(umbral ${UMBRAL_VARIANZA_LAPLACIANA}) · difColorProm=${difColorProm.toFixed(2)} ` +
+                        `(umbral ${UMBRAL_DIFERENCIA_COLOR}) · ¿pantalla? ${sospechaPantalla}`
+                    );
+                }
+
+                return { pantalla: sospechaPantalla, varianzaLap, difColorProm };
+            } catch (e) {
+                // Si el análisis falla por cualquier razón técnica, no bloquear
+                // el registro real por un error de este filtro adicional.
+                if (FILTRO_CALIDAD_DEBUG) console.warn('[Filtro de calidad] error:', e.message);
+                return { pantalla: false, motivo: 'error: ' + e.message };
+            }
+        }
+
         function iniciarEscaner() {
             html5QrCode = new Html5Qrcode("reader");
             Html5Qrcode.getCameras().then(dispositivos => {
@@ -367,7 +471,40 @@
                         dispositivos[0].id,
                         { fps: 10, qrbox: 240 },
                         (codigo) => {
-                            if (scannerActivo) registrarAsistencia(codigo);
+                            if (!scannerActivo) return;
+
+                            if (FILTRO_CALIDAD_ACTIVO) {
+                                const video = document.querySelector('#reader video');
+                                const analisis = video ? analizarCalidadImagen(video) : { pantalla: false };
+
+                                if (analisis.pantalla) {
+                                    scannerActivo = false;
+                                    mostrarMensaje(
+                                        'Código rechazado: parece estar mostrado desde una pantalla. Usa el carnet físico.',
+                                        'error', 'fa-mobile-alt'
+                                    );
+                                    agregarLog('Rechazado — QR mostrado desde una pantalla', 'error');
+
+                                    // Deja registro en la auditoría (tabla intentos_asistencia),
+                                    // aunque este intento nunca llegue a /registrar-asistencia.
+                                    fetch('{{ url("/registrar-intento-sospechoso") }}', {
+                                        method: 'POST',
+                                        headers: {
+                                            'Content-Type': 'application/json',
+                                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+                                        },
+                                        body: JSON.stringify({ codigo: codigo })
+                                    }).catch(() => {}); // si falla el registro de auditoría, no interrumpir al usuario
+
+                                    setTimeout(() => {
+                                        scannerActivo = true;
+                                        mostrarMensaje('Esperando escaneo...', 'waiting', 'fa-search');
+                                    }, 2000);
+                                    return;
+                                }
+                            }
+
+                            registrarAsistencia(codigo);
                         }
                     );
                 } else {
@@ -376,6 +513,7 @@
             }).catch(() => {
                 mostrarMensaje("Error al acceder a la cámara", "error", "fa-exclamation-triangle");
             });
+
         }
 
         function registrarAsistencia(codigo) {

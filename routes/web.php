@@ -45,6 +45,7 @@ Route::middleware('auth')->group(function () {
 
         Route::get('/escaner', [AsistenciaController::class, 'mostrarEscaner'])->name('escaner');
         Route::post('/registrar-asistencia', [AsistenciaController::class, 'registrarPorQR'])->name('asistencia.registrar');
+        Route::post('/registrar-intento-sospechoso', [AsistenciaController::class, 'registrarIntentoSospechoso'])->name('asistencia.intento-sospechoso');
         Route::get('/carnets', function () {
             $estudiantes = Estudiante::with(['grado', 'grupo'])->get();
             return view('carnets', compact('estudiantes'));

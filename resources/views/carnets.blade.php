@@ -115,7 +115,7 @@
                 <div class="card-carnet">
                     <div class="text-center">
                         <i class="fas fa-school" style="font-size: 45px; color: #60a5fa;"></i>
-                        <h4 class="mt-2" style="font-weight: bold;">I.E. San José</h4>
+                        <h4 class="mt-2" style="font-weight: bold;">{{ config('institucion.nombre_corto') }}</h4>
                         <h5 class="mt-3">{{ $estudiante->nombre }}</h5>
                         <p style="color: #94a3b8 !important; margin: 5px 0;">Grado: {{ $estudiante->grado->nombre }} &nbsp;·&nbsp; Grupo: {{ $estudiante->grupo->nombre }}</p>
                         

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 use App\Models\Asistencia;
 use App\Models\Estudiante;
 use App\Models\Horario;
+use App\Models\IntentoAsistencia;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Carbon\Carbon;
@@ -16,7 +17,7 @@ class AsistenciaController extends Controller {
     // navegador recibía la asistencia de todos los estudiantes y solo
     // escondía visualmente lo que no correspondía, lo cual no protegía nada.
     public function index() {
-        $query = Asistencia::with('estudiante.grupo')->orderBy('fecha', 'desc')->orderBy('hora', 'desc');
+        $query = Asistencia::orderBy('fecha', 'desc')->orderBy('hora', 'desc');
 
         $usuario = Auth::user();
         if ($usuario && $usuario->rol === 'estudiante') {
@@ -28,20 +29,7 @@ class AsistenciaController extends Controller {
         // El docente ve todos los registros, sin restricción por grado —
         // es la política intencional del proyecto, no un descuido.
 
-        // El grupo no se guarda como texto en cada asistencia (a diferencia
-        // del grado, que sí se copia como fotografía histórica) — se toma
-        // en vivo desde el estudiante actual. Si el estudiante cambió de
-        // grupo después de ese registro, esto muestra su grupo de HOY, no
-        // el de ese día. Avísame si prefieres que también quede fijo como
-        // el grado.
-        $asistencias = $query->get()->map(function ($a) {
-            $data = $a->toArray();
-            $data['grupo'] = $a->estudiante?->grupo?->nombre;
-            unset($data['estudiante']);
-            return $data;
-        });
-
-        return response()->json($asistencias);
+        return response()->json($query->get());
     }
 
     // Registrar asistencia manual (desde el panel)
@@ -120,6 +108,14 @@ class AsistenciaController extends Controller {
         $estudiante = Estudiante::where('codigo', $codigo)->first();
 
         if (!$estudiante) {
+            IntentoAsistencia::create([
+                'codigo' => $codigo,
+                'estudiante_id' => null,
+                'resultado' => 'no_encontrado',
+                'fecha' => now()->toDateString(),
+                'hora' => now()->toTimeString(),
+            ]);
+
             return response()->json([
                 'success' => false,
                 'mensaje' => '❌ Estudiante no encontrado. Código: ' . $codigo
@@ -133,6 +129,14 @@ class AsistenciaController extends Controller {
                             ->first();
 
         if ($existe) {
+            IntentoAsistencia::create([
+                'codigo' => $codigo,
+                'estudiante_id' => $estudiante->id,
+                'resultado' => 'duplicado',
+                'fecha' => $hoy,
+                'hora' => now()->toTimeString(),
+            ]);
+
             return response()->json([
                 'success' => false,
                 'mensaje' => "⚠️ {$estudiante->nombre} ya registró asistencia hoy a las {$existe->hora}"
@@ -170,5 +174,24 @@ class AsistenciaController extends Controller {
             'success' => true,
             'mensaje' => "✅ {$estudiante->nombre} - {$estado} a las " . $horaActual->format('h:i A')
         ]);
+    }
+
+    // Recibe el aviso del filtro de calidad del escáner (JS) cuando
+    // rechaza un código por parecer mostrado desde una pantalla, y lo
+    // guarda en la auditoría — así queda registro aunque el intento
+    // nunca haya llegado a registrarPorQR().
+    public function registrarIntentoSospechoso(Request $request) {
+        $codigo = $request->codigo;
+        $estudiante = Estudiante::where('codigo', $codigo)->first();
+
+        IntentoAsistencia::create([
+            'codigo' => $codigo ?? '(sin código)',
+            'estudiante_id' => $estudiante?->id,
+            'resultado' => 'pantalla_rechazada',
+            'fecha' => now()->toDateString(),
+            'hora' => now()->toTimeString(),
+        ]);
+
+        return response()->json(['ok' => true]);
     }
 }

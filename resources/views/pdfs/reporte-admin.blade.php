@@ -59,7 +59,7 @@
 <body>
     <div class="header">
         <h1>📊 Reporte de Asistencia</h1>
-        <p><strong>Institución Educativa San José</strong></p>
+        <p><strong>{{ config('institucion.nombre') }}</strong></p>
         <p>Fecha de generación: {{ now()->format('d/m/Y H:i') }}</p>
     </div>
 

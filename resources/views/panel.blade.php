@@ -18,7 +18,7 @@
                 <div class="psb-logo-ic"><i class="fas fa-qrcode"></i></div>
                 <div class="psb-logo-txt">
                     <h6>Panel de Control</h6>
-                    <small>I.E. San José</small>
+                    <small>{{ config('institucion.nombre_corto') }}</small>
                 </div>
             </div>
             <nav class="psb-nav" id="psb-nav">

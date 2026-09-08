@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Sistema de Asistencia · I.E. San José</title>
+    <title>Sistema de Asistencia · {{ config('institucion.nombre_corto') }}</title>
     <link
       href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css"
       rel="stylesheet"
@@ -630,7 +630,7 @@
           </p>
           <div class="contact-grid">
             <div class="contact-info">
-              <h2><span class="gradient-text">AUTA</span> · I.E. San José</h2>
+              <h2><span class="gradient-text">AUTA</span> · {{ config('institucion.nombre_corto') }}</h2>
               <p class="motto">
                 "Innovando en tecnología educativa para un futuro mejor"<br /><em
                   style="font-size: 0.85rem"
@@ -694,7 +694,7 @@
     <footer class="site-footer">
       <div class="footer-inner">
         <span class="f-copy"
-          >© 2026 AUTA · I.E. San José · Todos los derechos reservados</span
+          >© 2026 AUTA · {{ config('institucion.nombre_corto') }} · Todos los derechos reservados</span
         >
         <div class="f-links">
           <a onclick="goSection('inicio', null)">Inicio</a>

@@ -381,14 +381,17 @@
         // Los umbrales deben quedar en un punto intermedio que nunca rechace
         // el carnet físico real, pero sí distinga la pantalla.
         //
-        // Calibrado 2026-09-08 con datos reales: la señal de color
-        // (difColorProm) resultó mucho más confiable que la de textura/moiré
-        // (varianzaLap) a la distancia normal de escaneo — por eso la
-        // decisión depende de difColorProm. varianzaLap se sigue calculando
-        // y mostrando en consola por si sirve como señal adicional más
-        // adelante, pero ya no es obligatoria para rechazar.
+        // Calibrado 2026-09-08 con datos reales del equipo:
+        //   - Carnet físico:  difColorProm ≈ 5.10 y 5.66 (dos pruebas)
+        //   - Celular/pantalla: difColorProm ≈ 17.00 y 55.90 (dos pruebas,
+        //     con bastante variación entre sí — probablemente por brillo
+        //     de pantalla o distancia distintos en cada prueba)
+        // Umbral puesto en 12: a mitad de camino entre el físico más alto
+        // (5.66) y el celular más bajo (17.00). Con SOLO dos datos de cada
+        // lado, esto no está garantizado — sigan probando (ver mensaje del
+        // asistente) antes de confiar en esto para la sustentación en vivo.
         const UMBRAL_VARIANZA_LAPLACIANA = 4000;
-        const UMBRAL_DIFERENCIA_COLOR = 25;
+        const UMBRAL_DIFERENCIA_COLOR = 12;
 
         // Analiza la región central del video (donde debe estar el carnet)
         // buscando dos señales típicas de una pantalla capturada de cerca

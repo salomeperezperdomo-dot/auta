@@ -380,8 +380,15 @@
         // mismo QR mostrado en la pantalla de un celular y anotar esos valores.
         // Los umbrales deben quedar en un punto intermedio que nunca rechace
         // el carnet físico real, pero sí distinga la pantalla.
+        //
+        // Calibrado 2026-09-08 con datos reales: la señal de color
+        // (difColorProm) resultó mucho más confiable que la de textura/moiré
+        // (varianzaLap) a la distancia normal de escaneo — por eso la
+        // decisión depende de difColorProm. varianzaLap se sigue calculando
+        // y mostrando en consola por si sirve como señal adicional más
+        // adelante, pero ya no es obligatoria para rechazar.
         const UMBRAL_VARIANZA_LAPLACIANA = 4000;
-        const UMBRAL_DIFERENCIA_COLOR = 18;
+        const UMBRAL_DIFERENCIA_COLOR = 25;
 
         // Analiza la región central del video (donde debe estar el carnet)
         // buscando dos señales típicas de una pantalla capturada de cerca
@@ -442,9 +449,12 @@
                 }
                 const difColorProm = sumaDifColor / (data.length / 4);
 
-                const sospechaPantalla =
-                    varianzaLap > UMBRAL_VARIANZA_LAPLACIANA &&
-                    difColorProm > UMBRAL_DIFERENCIA_COLOR;
+                // Antes exigíamos las dos señales a la vez (&&). Con datos reales
+                // vimos que varianzaLap casi nunca llega a su umbral a la distancia
+                // normal de escaneo, así que la decisión ahora depende de
+                // difColorProm, que sí distinguió la pantalla con margen amplio
+                // (55.90 medido contra un umbral de 25).
+                const sospechaPantalla = difColorProm > UMBRAL_DIFERENCIA_COLOR;
 
                 if (FILTRO_CALIDAD_DEBUG) {
                     console.log(

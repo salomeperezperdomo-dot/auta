@@ -381,17 +381,17 @@
         // Los umbrales deben quedar en un punto intermedio que nunca rechace
         // el carnet físico real, pero sí distinga la pantalla.
         //
-        // Calibrado 2026-09-08 con datos reales del equipo:
-        //   - Carnet físico:  difColorProm ≈ 5.10 y 5.66 (dos pruebas)
-        //   - Celular/pantalla: difColorProm ≈ 17.00 y 55.90 (dos pruebas,
-        //     con bastante variación entre sí — probablemente por brillo
-        //     de pantalla o distancia distintos en cada prueba)
-        // Umbral puesto en 12: a mitad de camino entre el físico más alto
-        // (5.66) y el celular más bajo (17.00). Con SOLO dos datos de cada
-        // lado, esto no está garantizado — sigan probando (ver mensaje del
-        // asistente) antes de confiar en esto para la sustentación en vivo.
+        // Calibrado 2026-09-08 con 5+5 pruebas reales del equipo, mismas
+        // condiciones de mesa/luz:
+        //   - Carnet físico: 4.63, 7.69, 5.82, 5.74, 13.17
+        //   - Celular/pantalla: 15.64, 16.92, 17.70, 17.79, 33.22
+        // Hay separación, pero el margen es angosto (solo ~2.5 entre el
+        // físico más alto y el celular más bajo) — por eso el umbral solo
+        // no basta. Se agregó además una confirmación de 2 lecturas
+        // seguidas antes de rechazar (ver más abajo), para que una sola
+        // foto ruidosa del carnet real no lo tumbe.
         const UMBRAL_VARIANZA_LAPLACIANA = 4000;
-        const UMBRAL_DIFERENCIA_COLOR = 12;
+        const UMBRAL_DIFERENCIA_COLOR = 14.5;
 
         // Analiza la región central del video (donde debe estar el carnet)
         // buscando dos señales típicas de una pantalla capturada de cerca
@@ -478,6 +478,18 @@
 
         function iniciarEscaner() {
             html5QrCode = new Html5Qrcode("reader");
+
+            // Confirmación de 2 lecturas seguidas del MISMO código antes de
+            // rechazar por pantalla. Con el margen angosto que salió en las
+            // pruebas reales (carnet físico llegó hasta 13.17, celular bajó
+            // hasta 15.64 con umbral en 14.5), una sola foto ruidosa podía
+            // tumbar el carnet real. Exigir 2 lecturas seguidas por encima
+            // del umbral reduce mucho ese riesgo, porque el celular sale
+            // alto de forma consistente (5 de 5 en las pruebas) mientras que
+            // el físico solo se salió una vez de cinco.
+            let ultimoCodigoSospechoso = null;
+            let conteoSospechoso = 0;
+
             Html5Qrcode.getCameras().then(dispositivos => {
                 if (dispositivos && dispositivos.length > 0) {
                     html5QrCode.start(
@@ -491,6 +503,24 @@
                                 const analisis = video ? analizarCalidadImagen(video) : { pantalla: false };
 
                                 if (analisis.pantalla) {
+                                    if (ultimoCodigoSospechoso === codigo) {
+                                        conteoSospechoso++;
+                                    } else {
+                                        ultimoCodigoSospechoso = codigo;
+                                        conteoSospechoso = 1;
+                                    }
+                                } else {
+                                    ultimoCodigoSospechoso = null;
+                                    conteoSospechoso = 0;
+                                }
+
+                                if (FILTRO_CALIDAD_DEBUG) {
+                                    console.log(`[Filtro de calidad] confirmaciones seguidas: ${conteoSospechoso}/2`);
+                                }
+
+                                if (conteoSospechoso >= 2) {
+                                    ultimoCodigoSospechoso = null;
+                                    conteoSospechoso = 0;
                                     scannerActivo = false;
                                     mostrarMensaje(
                                         'Código rechazado: parece estar mostrado desde una pantalla. Usa el carnet físico.',
@@ -513,6 +543,12 @@
                                         scannerActivo = true;
                                         mostrarMensaje('Esperando escaneo...', 'waiting', 'fa-search');
                                     }, 2000);
+                                    return;
+                                }
+
+                                // Primera lectura sospechosa: esperar la siguiente lectura
+                                // del mismo código antes de decidir — no registrar todavía.
+                                if (analisis.pantalla) {
                                     return;
                                 }
                             }

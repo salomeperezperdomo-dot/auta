@@ -611,6 +611,65 @@
         </div>
       </div>
 
+      <!-- CONOCE MÁS: video demo, infografía y mini-juego -->
+      <div class="site-section" id="sec-conoce-mas">
+        <div class="sec-inner">
+          <h2 class="sec-h">
+            <i
+              class="fas fa-play-circle"
+              style="color: var(--blue-light); margin-right: 0.5rem"
+            ></i
+            >Conoce más sobre AUTA
+          </h2>
+          <p class="sec-sub">Video, datos y un pequeño juego sobre puntualidad</p>
+
+          <div class="cards-grid">
+            <!-- 1. Video de YouTube (demo de AUTA) -->
+            <div class="info-card">
+              <div class="card-ico ico-bl"><i class="fas fa-video"></i></div>
+              <h4>Video demostrativo</h4>
+              <p>Un recorrido en video por el funcionamiento real del sistema.</p>
+              <div style="position: relative; padding-bottom: 56.25%; height: 0; margin-top: 0.8rem; border-radius: 8px; overflow: hidden;">
+                {{-- Reemplazar VIDEO_ID_AQUI por el ID del video de YouTube una vez grabado y subido --}}
+                <iframe
+                  src="https://www.youtube.com/embed/VIDEO_ID_AQUI"
+                  title="Demo de AUTA"
+                  style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: 0;"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowfullscreen
+                ></iframe>
+              </div>
+            </div>
+
+            <!-- 2. Infografía en Canva -->
+            <div class="info-card">
+              <div class="card-ico ico-gr"><i class="fas fa-chart-pie"></i></div>
+              <h4>¿Por qué automatizar la asistencia?</h4>
+              <p>Una mirada rápida al problema que resuelve AUTA, con datos reales.</p>
+              {{-- Reemplazar por la ruta real de la imagen exportada desde Canva, ej: asset('images/infografia-ods.png') --}}
+              <img
+                src="{{ asset('images/infografia-ods.png') }}"
+                alt="Infografía: por qué automatizar la asistencia escolar"
+                style="width: 100%; border-radius: 8px; margin-top: 0.8rem;"
+              />
+            </div>
+
+            <!-- 3. Mini-juego en Scratch (convertido a HTML) -->
+            <div class="info-card">
+              <div class="card-ico ico-pu"><i class="fas fa-gamepad"></i></div>
+              <h4>Juego: llega a tiempo</h4>
+              <p>Un pequeño reto contrarreloj sobre puntualidad, hecho en Scratch.</p>
+              {{-- Reemplazar por la ruta real del .html exportado con htmlifier, ej: asset('juegos/llega-a-tiempo.html') --}}
+              <iframe
+                src="{{ asset('juegos/llega-a-tiempo.html') }}"
+                title="Mini-juego: llega a tiempo"
+                style="width: 100%; height: 360px; border: 0; border-radius: 8px; margin-top: 0.8rem;"
+              ></iframe>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- CONTACTO -->
       <div class="site-section" id="sec-contacto">
         <div class="sec-inner">

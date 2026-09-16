@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Llega a tiempo — AUTA</title>
+<style>
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: #0B1B33;
+    display: flex; align-items: center; justify-content: center;
+    font-family: Calibri, Arial, sans-serif;
+    overflow: hidden;
+  }
+  #wrap { text-align: center; }
+  canvas {
+    background: #132B52;
+    border-radius: 12px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.4);
+    touch-action: manipulation;
+  }
+  #hint {
+    color: #9AA5B1;
+    font-size: 14px;
+    margin-top: 10px;
+  }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <canvas id="juego" width="480" height="360"></canvas>
+  <div id="hint">Toca o haz clic en el botón verde antes de que se acabe el tiempo</div>
+</div>
+
+<script>
+const canvas = document.getElementById('juego');
+const ctx = canvas.getContext('2d');
+
+const AZUL_OSCURO = '#0B1B33';
+const AZUL = '#132B52';
+const AZUL_ACENTO = '#2E6FF2';
+const VERDE = '#22C55E';
+const ROJO = '#EF4444';
+const BLANCO = '#FFFFFF';
+const GRIS = '#9AA5B1';
+
+let estado = 'inicio'; // inicio | jugando | fin
+let puntos = 0;
+let ronda = 0;
+let vidas = 3;
+let tiempoLimite = 1800; // ms, se reduce cada ronda
+let tiempoRestante = tiempoLimite;
+let ultimoFrame = null;
+let mensajeFinal = '';
+
+const boton = { x: 190, y: 150, w: 100, h: 100 };
+
+function dentroDelBoton(x, y) {
+  return x >= boton.x && x <= boton.x + boton.w && y >= boton.y && y <= boton.y + boton.h;
+}
+
+function nuevaRonda() {
+  ronda++;
+  tiempoLimite = Math.max(600, 1800 - ronda * 90); // se pone más difícil cada ronda
+  tiempoRestante = tiempoLimite;
+}
+
+function registrarEntrada(aTiempo) {
+  if (aTiempo) {
+    puntos += 10;
+    nuevaRonda();
+  } else {
+    vidas--;
+    if (vidas <= 0) {
+      estado = 'fin';
+      mensajeFinal = 'Se acabaron los intentos. Como en la vida real: sin automatizar, siempre se pierden algunos.';
+    } else {
+      nuevaRonda();
+    }
+  }
+}
+
+canvas.addEventListener('click', (e) => {
+  const rect = canvas.getBoundingClientRect();
+  const x = (e.clientX - rect.left) * (canvas.width / rect.width);
+  const y = (e.clientY - rect.top) * (canvas.height / rect.height);
+
+  if (estado === 'inicio') {
+    estado = 'jugando';
+    puntos = 0; ronda = 0; vidas = 3;
+    nuevaRonda();
+    ultimoFrame = null;
+    return;
+  }
+  if (estado === 'fin') {
+    estado = 'inicio';
+    return;
+  }
+  if (estado === 'jugando' && dentroDelBoton(x, y)) {
+    registrarEntrada(tiempoRestante > 0);
+  }
+});
+
+function dibujarBotonRedondeado(x, y, w, h, r, color) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+  ctx.fillStyle = color;
+  ctx.fill();
+}
+
+function dibujarInicio() {
+  ctx.fillStyle = AZUL_OSCURO;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  ctx.fillStyle = BLANCO;
+  ctx.font = 'bold 28px Calibri, Arial';
+  ctx.textAlign = 'center';
+  ctx.fillText('Llega a tiempo', canvas.width / 2, 110);
+
+  ctx.fillStyle = GRIS;
+  ctx.font = '16px Calibri, Arial';
+  ctx.fillText('Un mini-juego sobre puntualidad', canvas.width / 2, 145);
+
+  dibujarBotonRedondeado(190, 190, 100, 50, 10, AZUL_ACENTO);
+  ctx.fillStyle = BLANCO;
+  ctx.font = 'bold 18px Calibri, Arial';
+  ctx.fillText('Jugar', canvas.width / 2, 222);
+
+  ctx.fillStyle = GRIS;
+  ctx.font = '13px Calibri, Arial';
+  ctx.fillText('Un proyecto de AUTA — I.E. San José', canvas.width / 2, 300);
+}
+
+function dibujarJuego(dt) {
+  tiempoRestante -= dt;
+  if (tiempoRestante < 0) tiempoRestante = 0;
+
+  ctx.fillStyle = AZUL_OSCURO;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Encabezado: puntos y vidas
+  ctx.fillStyle = BLANCO;
+  ctx.font = 'bold 16px Calibri, Arial';
+  ctx.textAlign = 'left';
+  ctx.fillText('Puntos: ' + puntos, 20, 30);
+  ctx.textAlign = 'right';
+  ctx.fillStyle = ROJO;
+  ctx.fillText('❤'.repeat(vidas), canvas.width - 20, 30);
+
+  // Barra de tiempo
+  const pct = tiempoRestante / tiempoLimite;
+  const barW = 360;
+  ctx.fillStyle = AZUL;
+  ctx.fillRect(60, 55, barW, 14);
+  ctx.fillStyle = pct > 0.3 ? VERDE : ROJO;
+  ctx.fillRect(60, 55, barW * pct, 14);
+
+  // Instrucción
+  ctx.fillStyle = GRIS;
+  ctx.font = '14px Calibri, Arial';
+  ctx.textAlign = 'center';
+  ctx.fillText('Registra tu entrada antes de que se acabe la barra', canvas.width / 2, 100);
+
+  // Botón de "registrar entrada" (como el escáner de AUTA)
+  const activo = tiempoRestante > 0;
+  dibujarBotonRedondeado(boton.x, boton.y, boton.w, boton.h, 16, activo ? VERDE : GRIS);
+  ctx.fillStyle = BLANCO;
+  ctx.font = 'bold 14px Calibri, Arial';
+  ctx.fillText('Registrar', canvas.width / 2, boton.y + boton.h / 2 - 4);
+  ctx.fillText('entrada', canvas.width / 2, boton.y + boton.h / 2 + 16);
+
+  ctx.fillStyle = GRIS;
+  ctx.font = '13px Calibri, Arial';
+  ctx.fillText('Ronda ' + ronda, canvas.width / 2, 300);
+
+  if (tiempoRestante <= 0) {
+    // Se acabó el tiempo sin que el jugador registrara → cuenta como fallo
+    registrarEntrada(false);
+  }
+}
+
+function dibujarFin() {
+  ctx.fillStyle = AZUL_OSCURO;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  ctx.fillStyle = BLANCO;
+  ctx.font = 'bold 24px Calibri, Arial';
+  ctx.textAlign = 'center';
+  ctx.fillText('¡Juego terminado!', canvas.width / 2, 120);
+
+  ctx.font = 'bold 20px Calibri, Arial';
+  ctx.fillStyle = VERDE;
+  ctx.fillText('Puntaje final: ' + puntos, canvas.width / 2, 160);
+
+  ctx.fillStyle = GRIS;
+  ctx.font = '14px Calibri, Arial';
+  wrapText(mensajeFinal, canvas.width / 2, 200, 380, 20);
+
+  dibujarBotonRedondeado(190, 260, 100, 44, 10, AZUL_ACENTO);
+  ctx.fillStyle = BLANCO;
+  ctx.font = 'bold 16px Calibri, Arial';
+  ctx.fillText('Jugar de nuevo', canvas.width / 2, 288);
+}
+
+function wrapText(texto, x, y, maxWidth, lineHeight) {
+  const palabras = texto.split(' ');
+  let linea = '';
+  let yy = y;
+  for (let i = 0; i < palabras.length; i++) {
+    const prueba = linea + palabras[i] + ' ';
+    if (ctx.measureText(prueba).width > maxWidth && i > 0) {
+      ctx.fillText(linea, x, yy);
+      linea = palabras[i] + ' ';
+      yy += lineHeight;
+    } else {
+      linea = prueba;
+    }
+  }
+  ctx.fillText(linea, x, yy);
+}
+
+function loop(t) {
+  if (ultimoFrame === null) ultimoFrame = t;
+  const dt = t - ultimoFrame;
+  ultimoFrame = t;
+
+  if (estado === 'inicio') dibujarInicio();
+  else if (estado === 'jugando') dibujarJuego(dt);
+  else if (estado === 'fin') dibujarFin();
+
+  requestAnimationFrame(loop);
+}
+
+dibujarInicio();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>

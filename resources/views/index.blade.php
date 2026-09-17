@@ -296,6 +296,13 @@
         </button>
         <button
           class="sb-btn"
+          data-sec="conoce-mas"
+          onclick="goSection('conoce-mas', this)"
+        >
+          <span class="sb-icon"><i class="fas fa-play-circle"></i></span>Conoce más
+        </button>
+        <button
+          class="sb-btn"
           data-sec="contacto"
           onclick="goSection('contacto', this)"
         >
@@ -759,6 +766,7 @@
           <a onclick="goSection('inicio', null)">Inicio</a>
           <a onclick="goSection('objetivos', null)">Objetivos</a>
           <a onclick="goSection('equipo', null)">Equipo</a>
+          <a onclick="goSection('conoce-mas', null)">Conoce más</a>
           <a onclick="goSection('contacto', null)">Contacto / Contact</a>
         </div>
         <div class="f-socials">

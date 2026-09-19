@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Camino a clase — AUTA</title>
+<style>
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: #0B1B33;
+    display: flex; align-items: center; justify-content: center;
+    font-family: Calibri, Arial, sans-serif;
+    overflow: hidden;
+  }
+  #wrap { text-align: center; }
+  canvas {
+    background: #132B52;
+    border-radius: 12px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.4);
+    touch-action: manipulation;
+  }
+  #hint { color: #9AA5B1; font-size: 14px; margin-top: 10px; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <canvas id="juego"></canvas>
+  <div id="hint">Toca, haz clic o pulsa ESPACIO para saltar</div>
+</div>
+
+<script>
+const canvas = document.getElementById('juego');
+const ctx = canvas.getContext('2d');
+
+const AZUL_OSCURO = '#0B1B33';
+const AZUL        = '#132B52';
+const AZUL_CLARO  = '#1A3560';
+const ACENTO      = '#2E6FF2';
+const VERDE       = '#22C55E';
+const ROJO        = '#EF4444';
+const BLANCO      = '#FFFFFF';
+const GRIS        = '#9AA5B1';
+
+let SUELO_Y = 200;
+const GRAVEDAD = 0.0022;
+const FUERZA_SALTO = -0.85;
+const DURACION_JORNADA = 45000; // ms para llegar antes de que "suene el timbre"
+
+let estado = 'inicio'; // inicio | jugando | fin
+let ultimoFrame = null;
+let tiempoJuego = 0;
+let distancia = 0;
+let velocidad = 0.28; // px/ms, aumenta con el tiempo
+let golpes = 0;
+const MAX_GOLPES = 3;
+let resultado = ''; // 'presente' | 'retardo' | 'ausente'
+
+const jugador = { x: 90, y: SUELO_Y, vy: 0, w: 34, h: 46, enElAire: false, invulnerableMs: 0 };
+
+let obstaculos = [];
+let proximoObstaculoEn = 0;
+
+// El canvas se ajusta al espacio real disponible (el ancho del iframe/tarjeta
+// donde se embebe), en vez de tener un tamaño fijo — así el personaje nunca
+// queda cortado fuera de la vista, sin importar qué tan angosta sea la tarjeta.
+function ajustarTamano() {
+  const anchoDisponible = document.documentElement.clientWidth;
+  const altoDisponible = document.documentElement.clientHeight;
+  canvas.width = Math.max(300, Math.min(700, anchoDisponible - 4));
+  canvas.height = Math.max(220, Math.min(360, altoDisponible - 40));
+  SUELO_Y = canvas.height - 60;
+  jugador.x = Math.round(canvas.width * 0.12);
+  if (estado !== 'jugando') jugador.y = SUELO_Y;
+}
+window.addEventListener('resize', ajustarTamano);
+ajustarTamano();
+
+// Tipos de obstáculo, con temática escolar/puntualidad
+const TIPOS_OBSTACULO = [
+  { nombre: 'mochila', w: 30, h: 28, color: '#F59E0B' },
+  { nombre: 'charco',  w: 46, h: 14, color: '#38BDF8', bajo: true },
+  { nombre: 'banca',   w: 40, h: 38, color: '#A78BFA' },
+];
+
+function reiniciar() {
+  tiempoJuego = 0;
+  distancia = 0;
+  velocidad = 0.28;
+  golpes = 0;
+  obstaculos = [];
+  proximoObstaculoEn = 900;
+  jugador.y = SUELO_Y;
+  jugador.vy = 0;
+  jugador.enElAire = false;
+  jugador.invulnerableMs = 0;
+  resultado = '';
+}
+
+function saltar() {
+  if (!jugador.enElAire) {
+    jugador.vy = FUERZA_SALTO;
+    jugador.enElAire = true;
+  }
+}
+
+function iniciarInteraccion() {
+  if (estado === 'inicio' || estado === 'fin') {
+    estado = 'jugando';
+    reiniciar();
+    ultimoFrame = null;
+  } else if (estado === 'jugando') {
+    saltar();
+  }
+}
+
+canvas.addEventListener('click', iniciarInteraccion);
+window.addEventListener('keydown', (e) => {
+  if (e.code === 'Space' || e.code === 'ArrowUp') {
+    e.preventDefault();
+    iniciarInteraccion();
+  }
+});
+
+function generarObstaculo() {
+  const tipo = TIPOS_OBSTACULO[Math.floor(Math.random() * TIPOS_OBSTACULO.length)];
+  obstaculos.push({
+    x: canvas.width + 20,
+    w: tipo.w,
+    h: tipo.h,
+    color: tipo.color,
+    bajo: !!tipo.bajo,
+  });
+}
+
+function colisiona(a, b) {
+  return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+}
+
+function actualizar(dt) {
+  tiempoJuego += dt;
+  velocidad = 0.28 + Math.min(0.22, tiempoJuego / 90000);
+  distancia += velocidad * dt;
+
+  // Física del salto
+  jugador.vy += GRAVEDAD * dt;
+  jugador.y += jugador.vy * dt;
+  if (jugador.y > SUELO_Y) {
+    jugador.y = SUELO_Y;
+    jugador.vy = 0;
+    jugador.enElAire = false;
+  }
+  if (jugador.invulnerableMs > 0) jugador.invulnerableMs -= dt;
+
+  // Obstáculos
+  proximoObstaculoEn -= dt;
+  if (proximoObstaculoEn <= 0) {
+    generarObstaculo();
+    proximoObstaculoEn = 900 + Math.random() * 700 - Math.min(400, tiempoJuego / 120);
+  }
+
+  const jugadorRect = { x: jugador.x, y: jugador.y - jugador.h, w: jugador.w, h: jugador.h };
+
+  for (let i = obstaculos.length - 1; i >= 0; i--) {
+    const o = obstaculos[i];
+    o.x -= velocidad * dt;
+
+    const oRect = o.bajo
+      ? { x: o.x, y: SUELO_Y - o.h + 6, w: o.w, h: o.h }
+      : { x: o.x, y: SUELO_Y - o.h, w: o.w, h: o.h };
+
+    if (jugador.invulnerableMs <= 0 && colisiona(jugadorRect, oRect)) {
+      golpes++;
+      jugador.invulnerableMs = 900;
+      obstaculos.splice(i, 1);
+      if (golpes >= MAX_GOLPES) {
+        resultado = 'ausente';
+        estado = 'fin';
+      }
+      continue;
+    }
+
+    if (o.x + o.w < -20) obstaculos.splice(i, 1);
+  }
+
+  // Condición de llegada
+  if (estado === 'jugando' && tiempoJuego >= DURACION_JORNADA) {
+    resultado = golpes === 0 ? 'presente' : 'retardo';
+    estado = 'fin';
+  }
+}
+
+function dibujarFondo() {
+  ctx.fillStyle = AZUL_OSCURO;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  // Línea de "suelo"
+  ctx.strokeStyle = AZUL_CLARO;
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(0, SUELO_Y + 2);
+  ctx.lineTo(canvas.width, SUELO_Y + 2);
+  ctx.stroke();
+}
+
+function dibujarJugador() {
+  const parpadea = jugador.invulnerableMs > 0 && Math.floor(jugador.invulnerableMs / 100) % 2 === 0;
+  if (parpadea) return;
+  ctx.fillStyle = VERDE;
+  const x = jugador.x, y = jugador.y - jugador.h;
+  // cuerpo simple: cabeza + torso, como un estudiante corriendo
+  ctx.beginPath();
+  ctx.arc(x + jugador.w / 2, y + 9, 9, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillRect(x + 6, y + 16, jugador.w - 12, jugador.h - 16);
+}
+
+function dibujarObstaculos() {
+  for (const o of obstaculos) {
+    const y = o.bajo ? SUELO_Y - o.h + 6 : SUELO_Y - o.h;
+    ctx.fillStyle = o.color;
+    ctx.fillRect(o.x, y, o.w, o.h);
+  }
+}
+
+function dibujarHUD() {
+  const restante = Math.max(0, DURACION_JORNADA - tiempoJuego);
+  const pct = restante / DURACION_JORNADA;
+
+  ctx.fillStyle = BLANCO;
+  ctx.font = 'bold 14px Calibri, Arial';
+  ctx.textAlign = 'left';
+  ctx.fillText('Distancia: ' + Math.floor(distancia / 10) + ' m', 16, 26);
+
+  ctx.textAlign = 'right';
+  ctx.fillStyle = golpes >= MAX_GOLPES - 1 ? ROJO : BLANCO;
+  ctx.fillText('Golpes: ' + golpes + ' / ' + MAX_GOLPES, canvas.width - 16, 26);
+
+  // Barra de "tiempo hasta el timbre"
+  const barW = canvas.width - 32;
+  ctx.fillStyle = AZUL;
+  ctx.fillRect(16, 36, barW, 10);
+  ctx.fillStyle = pct > 0.25 ? VERDE : ROJO;
+  ctx.fillRect(16, 36, barW * pct, 10);
+}
+
+function dibujarInicio() {
+  dibujarFondo();
+  ctx.fillStyle = BLANCO;
+  ctx.font = 'bold 32px Calibri, Arial';
+  ctx.textAlign = 'center';
+  ctx.fillText('Camino a clase', canvas.width / 2, 130);
+
+  ctx.fillStyle = GRIS;
+  ctx.font = '16px Calibri, Arial';
+  ctx.fillText('Salta los obstáculos y llega antes de que suene el timbre', canvas.width / 2, 165);
+
+  dibujarBoton(canvas.width / 2 - 60, 200, 120, 46, 'Jugar');
+
+  ctx.fillStyle = GRIS;
+  ctx.font = '13px Calibri, Arial';
+  ctx.fillText('Un proyecto de AUTA — I.E. San José', canvas.width / 2, 320);
+}
+
+function dibujarBoton(x, y, w, h, texto) {
+  ctx.fillStyle = ACENTO;
+  ctx.beginPath();
+  ctx.moveTo(x + 10, y);
+  ctx.arcTo(x + w, y, x + w, y + h, 10);
+  ctx.arcTo(x + w, y + h, x, y + h, 10);
+  ctx.arcTo(x, y + h, x, y, 10);
+  ctx.arcTo(x, y, x + w, y, 10);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = BLANCO;
+  ctx.font = 'bold 17px Calibri, Arial';
+  ctx.textAlign = 'center';
+  ctx.fillText(texto, x + w / 2, y + h / 2 + 6);
+}
+
+function dibujarFin() {
+  dibujarFondo();
+
+  const textos = {
+    presente:  { titulo: '¡Llegaste a tiempo!',   color: VERDE, msg: 'Sin golpes, como cuando AUTA detecta un registro puntual.' },
+    retardo:   { titulo: 'Llegaste, pero tarde',  color: '#F59E0B', msg: 'Tropezaste algunas veces en el camino — igual que un retardo real.' },
+    ausente:   { titulo: 'No llegaste a clase',   color: ROJO, msg: 'Demasiados golpes en el camino. Inténtalo de nuevo.' },
+  };
+  const info = textos[resultado] || textos.retardo;
+
+  ctx.fillStyle = BLANCO;
+  ctx.font = 'bold 26px Calibri, Arial';
+  ctx.textAlign = 'center';
+  ctx.fillText(info.titulo, canvas.width / 2, 120);
+
+  ctx.fillStyle = info.color;
+  ctx.font = 'bold 18px Calibri, Arial';
+  ctx.fillText('Distancia recorrida: ' + Math.floor(distancia / 10) + ' m', canvas.width / 2, 155);
+
+  ctx.fillStyle = GRIS;
+  ctx.font = '14px Calibri, Arial';
+  wrapText(info.msg, canvas.width / 2, 190, 480, 20);
+
+  dibujarBoton(canvas.width / 2 - 80, 240, 160, 46, 'Jugar de nuevo');
+}
+
+function wrapText(texto, x, y, maxWidth, lineHeight) {
+  const palabras = texto.split(' ');
+  let linea = '';
+  let yy = y;
+  for (let i = 0; i < palabras.length; i++) {
+    const prueba = linea + palabras[i] + ' ';
+    if (ctx.measureText(prueba).width > maxWidth && i > 0) {
+      ctx.fillText(linea, x, yy);
+      linea = palabras[i] + ' ';
+      yy += lineHeight;
+    } else {
+      linea = prueba;
+    }
+  }
+  ctx.fillText(linea, x, yy);
+}
+
+function dibujarJugando() {
+  dibujarFondo();
+  dibujarObstaculos();
+  dibujarJugador();
+  dibujarHUD();
+}
+
+function loop(t) {
+  if (ultimoFrame === null) ultimoFrame = t;
+  const dt = Math.min(40, t - ultimoFrame); // limitar dt para evitar saltos raros si la pestaña pierde foco
+  ultimoFrame = t;
+
+  if (estado === 'jugando') {
+    actualizar(dt);
+    dibujarJugando();
+  } else if (estado === 'inicio') {
+    dibujarInicio();
+  } else if (estado === 'fin') {
+    dibujarFin();
+  }
+
+  requestAnimationFrame(loop);
+}
+
+dibujarInicio();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>

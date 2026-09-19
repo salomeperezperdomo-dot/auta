@@ -13,6 +13,7 @@ use App\Http\Controllers\ReporteAsistenciaController;
 // RUTAS PÚBLICAS (no requieren haber iniciado sesión)
 // ══════════════════════════════════════════════════════
 Route::get('/', function () { return view('index'); });
+Route::get('/conoce-mas', function () { return view('conoce-mas'); });
 Route::get('/login', function () { return view('login'); })->name('login');
 // Máximo 5 intentos de login por minuto (por IP) — protección básica contra
 // fuerza bruta. Si se exceden, Laravel responde 429 automáticamente.

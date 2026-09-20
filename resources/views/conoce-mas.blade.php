@@ -74,16 +74,16 @@
             <div class="card-ico ico-bl"><i class="fas fa-video"></i></div>
             <h4>Video demostrativo</h4>
             <p>Un recorrido en video por el funcionamiento real del sistema.</p>
-            <div style="position: relative; padding-bottom: 56.25%; height: 0; margin-top: 0.8rem; border-radius: 8px; overflow: hidden;">
-              {{-- Reemplazar VIDEO_ID_AQUI por el ID del video de YouTube una vez grabado y subido --}}
-              <iframe
-                src="https://www.youtube.com/embed/VIDEO_ID_AQUI"
-                title="Demo de AUTA"
-                style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: 0;"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowfullscreen
-              ></iframe>
-            </div>
+            {{-- Reemplazar VIDEO_ID_AQUI por el ID del video de YouTube una vez grabado y subido --}}
+            <a
+              href="https://www.youtube.com/watch?v=VIDEO_ID_AQUI"
+              target="_blank"
+              rel="noopener"
+              class="btn-prim"
+              style="display: inline-block; margin-top: 0.8rem; text-decoration: none;"
+            >
+              <i class="fas fa-external-link-alt"></i> Ver video
+            </a>
           </div>
 
           <!-- 2. Infografía en Canva -->
@@ -92,11 +92,15 @@
             <h4>¿Por qué automatizar la asistencia?</h4>
             <p>Una mirada rápida al problema que resuelve AUTA, con datos reales.</p>
             {{-- Reemplazar por la ruta real de la imagen exportada desde Canva --}}
-            <img
-              src="{{ asset('images/infografia-ods.png') }}"
-              alt="Infografía: por qué automatizar la asistencia escolar"
-              style="width: 100%; border-radius: 8px; margin-top: 0.8rem;"
-            />
+            <a
+              href="{{ asset('images/infografia-ods.png') }}"
+              target="_blank"
+              rel="noopener"
+              class="btn-prim"
+              style="display: inline-block; margin-top: 0.8rem; text-decoration: none;"
+            >
+              <i class="fas fa-external-link-alt"></i> Ver infografía
+            </a>
           </div>
 
           <!-- 3. Mini-juego: "Camino a clase" -->
@@ -104,11 +108,15 @@
             <div class="card-ico ico-pu"><i class="fas fa-gamepad"></i></div>
             <h4>Juego: Camino a clase</h4>
             <p>Salta los obstáculos y llega antes de que suene el timbre.</p>
-            <iframe
-              src="{{ asset('juegos/camino-a-clase.html') }}"
-              title="Mini-juego: Camino a clase"
-              style="width: 100%; height: 360px; border: 0; border-radius: 8px; margin-top: 0.8rem;"
-            ></iframe>
+            <a
+              href="{{ asset('juegos/camino-a-clase.html') }}"
+              target="_blank"
+              rel="noopener"
+              class="btn-prim"
+              style="display: inline-block; margin-top: 0.8rem; text-decoration: none;"
+            >
+              <i class="fas fa-external-link-alt"></i> Jugar
+            </a>
           </div>
         </div>
       </div>

@@ -66,7 +66,7 @@
           ></i
           >Conoce más sobre AUTA
         </h2>
-        <p class="sec-sub">Video, datos y un pequeño juego sobre puntualidad</p>
+        <p class="sec-sub">Video, datos, un pequeño juego y el manual de usuario</p>
 
         <div class="cards-grid">
           <!-- 1. Video de YouTube (demo de AUTA) -->
@@ -116,6 +116,22 @@
               style="display: inline-block; margin-top: 0.8rem; text-decoration: none;"
             >
               <i class="fas fa-external-link-alt"></i> Jugar
+            </a>
+          </div>
+
+          <!-- 4. Manual de usuario (PDF) -->
+          <div class="info-card">
+            <div class="card-ico ico-bl"><i class="fas fa-book"></i></div>
+            <h4>Manual de usuario</h4>
+            <p>Guía paso a paso para usar AUTA según tu rol: administrador, docente o estudiante.</p>
+            <a
+              href="{{ asset('docs/manual-de-usuario.pdf') }}"
+              target="_blank"
+              rel="noopener"
+              class="btn-prim"
+              style="display: inline-block; margin-top: 0.8rem; text-decoration: none;"
+            >
+              <i class="fas fa-external-link-alt"></i> Ver manual
             </a>
           </div>
         </div>

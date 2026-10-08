@@ -293,6 +293,53 @@
             font-weight: 600;
             color: var(--accent2);
         }
+
+        /* Panel de calibración (solo con ?calibrar=1) */
+        .cal-wrap { width: 100%; max-width: 560px; padding: 0 1.25rem 2rem; display: none; }
+        .cal-card {
+            background: var(--glass);
+            border: 1px solid rgba(245, 158, 11, 0.35);
+            border-radius: 20px;
+            padding: 1.1rem 1.25rem;
+            color: var(--text);
+            font-size: 0.82rem;
+        }
+        .cal-card h6 {
+            font-family: "Sora", sans-serif;
+            font-weight: 700;
+            color: var(--accent);
+            font-size: 0.9rem;
+            margin-bottom: 0.4rem;
+        }
+        .cal-live { font-size: 1.4rem; font-weight: 700; color: #fff; font-family: "Sora", sans-serif; }
+        .cal-live small { font-size: 0.72rem; font-weight: 400; color: var(--muted); }
+        .cal-radios { display: flex; gap: 0.5rem; flex-wrap: wrap; margin: 0.75rem 0; }
+        .cal-radios label {
+            flex: 1;
+            text-align: center;
+            padding: 0.5rem 0.4rem;
+            border-radius: 10px;
+            border: 1px solid var(--glass-b);
+            cursor: pointer;
+            color: var(--muted);
+            font-weight: 600;
+        }
+        .cal-radios input { display: none; }
+        .cal-radios input:checked + span { color: #fff; }
+        .cal-radios label:has(input:checked) { background: rgba(37, 99, 235, 0.25); border-color: var(--blue-light); }
+        .cal-table { width: 100%; border-collapse: collapse; margin-top: 0.5rem; }
+        .cal-table th, .cal-table td { padding: 0.3rem 0.35rem; border-bottom: 1px solid rgba(255,255,255,0.06); text-align: right; }
+        .cal-table th:first-child, .cal-table td:first-child { text-align: left; }
+        .cal-table th { color: var(--muted); font-weight: 500; }
+        .cal-sug { margin-top: 0.75rem; padding: 0.7rem 0.85rem; border-radius: 10px; background: rgba(37, 99, 235, 0.12); border: 1px solid rgba(37, 99, 235, 0.25); }
+        .cal-sug.mal { background: rgba(239, 68, 68, 0.12); border-color: rgba(239, 68, 68, 0.3); color: #f87171; }
+        .cal-sug.bien { background: rgba(16, 185, 129, 0.12); border-color: rgba(16, 185, 129, 0.3); color: var(--accent2); }
+        .cal-btns { display: flex; gap: 0.5rem; margin-top: 0.75rem; }
+        .cal-btns button {
+            flex: 1; padding: 0.5rem; border-radius: 10px; cursor: pointer; font-weight: 600; font-size: 0.8rem;
+            background: var(--glass); border: 1px solid var(--glass-b); color: var(--muted);
+        }
+        .cal-btns button:hover { color: #fff; border-color: rgba(255,255,255,0.25); }
     </style>
 </head>
 <body>
@@ -354,6 +401,25 @@
 
     </div>
 
+    <!-- Panel de calibración: solo visible con /escaner?calibrar=1 -->
+    <div class="cal-wrap" id="cal-wrap">
+        <div class="cal-card">
+            <h6><i class="fas fa-sliders-h"></i> Modo calibración (no registra asistencia)</h6>
+            <div class="cal-live" id="cal-live">—<small> esperando un QR…</small></div>
+            <div class="cal-radios">
+                <label><input type="radio" name="cal-clase" value="ninguna" checked><span>No grabar</span></label>
+                <label><input type="radio" name="cal-clase" value="fisico"><span>Grabar FÍSICO</span></label>
+                <label><input type="radio" name="cal-clase" value="pantalla"><span>Grabar PANTALLA</span></label>
+            </div>
+            <table class="cal-table" id="cal-tabla"></table>
+            <div class="cal-sug" id="cal-sug">Elige una clase y muestra el QR frente a la cámara unos segundos.</div>
+            <div class="cal-btns">
+                <button type="button" onclick="calCopiar()"><i class="fas fa-copy"></i> Copiar resultados</button>
+                <button type="button" onclick="calLimpiar()"><i class="fas fa-trash"></i> Borrar muestras</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         let scannerActivo = true;
         let html5QrCode;
@@ -371,7 +437,13 @@
         // Poner en true mientras se calibra: muestra en la consola del
         // navegador (F12 → Console) los valores medidos en cada intento,
         // para poder ajustar los umbrales con el carnet y un celular reales.
-        const FILTRO_CALIDAD_DEBUG = true;
+        // Se activa solo desde la URL, para no dejarlo prendido en la demo:
+        //   /escaner?debug=1     -> imprime los valores en la consola
+        //   /escaner?calibrar=1  -> panel de calibración en pantalla; en este
+        //                           modo NO se registra asistencia ni auditoría.
+        const PARAMS_URL = new URLSearchParams(window.location.search);
+        const MODO_CALIBRACION = PARAMS_URL.get('calibrar') === '1';
+        const FILTRO_CALIDAD_DEBUG = MODO_CALIBRACION || PARAMS_URL.get('debug') === '1';
 
         // Umbrales de partida — NO están garantizados para su cámara/carnet
         // específicos. Hay que calibrarlos así: activar FILTRO_CALIDAD_DEBUG,
@@ -392,6 +464,12 @@
         // foto ruidosa del carnet real no lo tumbe.
         const UMBRAL_VARIANZA_LAPLACIANA = 4000;
         const UMBRAL_DIFERENCIA_COLOR = 14.5;
+        // Métrica B (croma residual, compensa el tinte de la luz). Su umbral es
+        // PROVISIONAL: no se usa hasta calibrarlo con ?calibrar=1 y cambiar
+        // METRICA_FILTRO a 'B'.
+        const UMBRAL_CROMA_RESIDUAL = 6.0;
+        // 'A' = color promedio (la calibración original) · 'B' = croma residual
+        const METRICA_FILTRO = 'A';
 
         // Analiza la región central del video (donde debe estar el carnet)
         // buscando dos señales típicas de una pantalla capturada de cerca
@@ -452,22 +530,55 @@
                 }
                 const difColorProm = sumaDifColor / (data.length / 4);
 
-                // Antes exigíamos las dos señales a la vez (&&). Con datos reales
-                // vimos que varianzaLap casi nunca llega a su umbral a la distancia
-                // normal de escaneo, así que la decisión ahora depende de
-                // difColorProm, que sí distinguió la pantalla con margen amplio
-                // (55.90 medido contra un umbral de 25).
-                const sospechaPantalla = difColorProm > UMBRAL_DIFERENCIA_COLOR;
+                // 3) Métrica B: "croma residual". La métrica A promedia TODO el
+                // recorte, así que sube con una luz cálida (el papel blanco se ve
+                // amarillento) o con las zonas de color del carnet, aunque no sea
+                // una pantalla. Esta versión usa solo píxeles casi negros o casi
+                // blancos (los módulos del QR), agrupados por separado, y le
+                // resta a cada grupo su tinte medio. Lo que queda es el "ruido
+                // de color" fino que mete una pantalla, sin importar la luz.
+                const nGrupo = [0, 0], sumRG = [0, 0], sumBG = [0, 0];
+                const grupoPx = new Int8Array(cw * ch);
+                for (let i = 0, p = 0; i < data.length; i += 4, p++) {
+                    const lum = gris[p];
+                    const gr = lum < 70 ? 0 : (lum > 170 ? 1 : -1);
+                    grupoPx[p] = gr;
+                    if (gr >= 0) {
+                        nGrupo[gr]++;
+                        sumRG[gr] += data[i] - data[i + 1];
+                        sumBG[gr] += data[i + 2] - data[i + 1];
+                    }
+                }
+                let sumaResid = 0, nResid = 0;
+                for (let i = 0, p = 0; i < data.length; i += 4, p++) {
+                    const gr = grupoPx[p];
+                    if (gr < 0) continue;
+                    const mrg = sumRG[gr] / nGrupo[gr], mbg = sumBG[gr] / nGrupo[gr];
+                    sumaResid += Math.abs((data[i] - data[i + 1]) - mrg) + Math.abs((data[i + 2] - data[i + 1]) - mbg);
+                    nResid++;
+                }
+                const cromaResidual = nResid > 500 ? sumaResid / nResid : null;
+
+                // La decisión usa la métrica elegida en METRICA_FILTRO.
+                const valorFiltro = (METRICA_FILTRO === 'B') ? cromaResidual : difColorProm;
+                const umbralFiltro = (METRICA_FILTRO === 'B') ? UMBRAL_CROMA_RESIDUAL : UMBRAL_DIFERENCIA_COLOR;
+                if (valorFiltro === null) {
+                    return { pantalla: false, motivo: 'pocos píxeles neutros', difColorProm, cromaResidual };
+                }
+                const sospechaPantalla = valorFiltro > umbralFiltro;
 
                 if (FILTRO_CALIDAD_DEBUG) {
                     console.log(
-                        `[Filtro de calidad] varianzaLap=${varianzaLap.toFixed(0)} ` +
-                        `(umbral ${UMBRAL_VARIANZA_LAPLACIANA}) · difColorProm=${difColorProm.toFixed(2)} ` +
-                        `(umbral ${UMBRAL_DIFERENCIA_COLOR}) · ¿pantalla? ${sospechaPantalla}`
+                        `[Filtro de calidad] A(color prom)=${difColorProm.toFixed(2)} (umbral ${UMBRAL_DIFERENCIA_COLOR}) · ` +
+                        `B(croma residual)=${cromaResidual === null ? 'n/d' : cromaResidual.toFixed(2)} (umbral ${UMBRAL_CROMA_RESIDUAL}) · ` +
+                        `métrica activa: ${METRICA_FILTRO} · ¿pantalla? ${sospechaPantalla}`
                     );
                 }
 
-                return { pantalla: sospechaPantalla, varianzaLap, difColorProm };
+                return {
+                    pantalla: sospechaPantalla, valor: valorFiltro, umbral: umbralFiltro,
+                    varianzaLap, difColorProm, cromaResidual
+                };
             } catch (e) {
                 // Si el análisis falla por cualquier razón técnica, no bloquear
                 // el registro real por un error de este filtro adicional.
@@ -476,19 +587,124 @@
             }
         }
 
+        // ---------------- Panel de calibración ----------------
+        const calMuestras = { fisico: [], pantalla: [] };
+        const CAL_METRICAS = [
+            { id: 'A', nombre: 'A · color promedio', umbral: () => UMBRAL_DIFERENCIA_COLOR },
+            { id: 'B', nombre: 'B · croma residual', umbral: () => UMBRAL_CROMA_RESIDUAL }
+        ];
+
+        function calPercentil(arr, p) {
+            if (!arr.length) return null;
+            const o = [...arr].sort((a, b) => a - b);
+            const i = (o.length - 1) * p, lo = Math.floor(i), hi = Math.ceil(i);
+            return o[lo] + (o[hi] - o[lo]) * (i - lo);
+        }
+        const calFmt = v => (v === null || v === undefined) ? '—' : v.toFixed(2);
+
+        function calMuestra(med) {
+            if (typeof med.difColorProm !== 'number' || typeof med.cromaResidual !== 'number') return;
+            const clase = (document.querySelector('input[name="cal-clase"]:checked') || {}).value;
+            if (clase === 'fisico' || clase === 'pantalla') {
+                calMuestras[clase].push({ A: med.difColorProm, B: med.cromaResidual });
+            }
+            document.getElementById('cal-live').innerHTML =
+                `A=${med.difColorProm.toFixed(2)} · B=${med.cromaResidual.toFixed(2)}` +
+                `<small> · filtro activo: métrica ${METRICA_FILTRO}</small>`;
+            calRender();
+        }
+
+        function calStats(arr, umbral, esperaPantalla) {
+            const mal = arr.filter(v => esperaPantalla ? v <= umbral : v > umbral).length;
+            return {
+                n: arr.length,
+                min: arr.length ? Math.min(...arr) : null,
+                p5: calPercentil(arr, 0.05), med: calPercentil(arr, 0.5), p95: calPercentil(arr, 0.95),
+                max: arr.length ? Math.max(...arr) : null,
+                pctMal: arr.length ? (100 * mal / arr.length) : null
+            };
+        }
+
+        function calAnalisis(m) {
+            const vf = calMuestras.fisico.map(x => x[m.id]);
+            const vp = calMuestras.pantalla.map(x => x[m.id]);
+            const f = calStats(vf, m.umbral(), false);
+            const p = calStats(vp, m.umbral(), true);
+            let margen = null, sugerido = null;
+            if (f.n >= 10 && p.n >= 10) {
+                margen = (p.p5 - f.p95) / p.p5;      // > 0 = se separan
+                sugerido = (f.p95 + p.p5) / 2;
+            }
+            return { m, f, p, margen, sugerido };
+        }
+
+        function calRender() {
+            const res = CAL_METRICAS.map(calAnalisis);
+            const fila = (nom, s) => `<tr><td>${nom}</td><td>${s.n}</td><td>${calFmt(s.min)}</td>` +
+                `<td>${calFmt(s.med)}</td><td>${calFmt(s.max)}</td>` +
+                `<td>${s.pctMal === null ? '—' : s.pctMal.toFixed(0) + '%'}</td></tr>`;
+            document.getElementById('cal-tabla').innerHTML =
+                `<tr><th>Métrica / clase</th><th>n</th><th>mín</th><th>mediana</th><th>máx</th><th>mal*</th></tr>` +
+                res.map(r => `<tr><td colspan="6" style="text-align:left;color:#fff;font-weight:600">${r.m.nombre}` +
+                    ` (umbral ${r.m.umbral()})</td></tr>` + fila('&nbsp;&nbsp;Físico', r.f) + fila('&nbsp;&nbsp;Pantalla', r.p)).join('') +
+                `<tr><td colspan="6" style="text-align:left;color:var(--muted)">*mal = % de lecturas del lado equivocado del umbral actual</td></tr>`;
+
+            const sug = document.getElementById('cal-sug');
+            const listas = res.filter(r => r.margen !== null);
+            if (!listas.length) {
+                sug.className = 'cal-sug';
+                sug.textContent = 'Graba al menos 10 lecturas de FÍSICO y 10 de PANTALLA para obtener un umbral sugerido.';
+                return;
+            }
+            const buenas = listas.filter(r => r.margen > 0).sort((a, b) => b.margen - a.margen);
+            if (buenas.length) {
+                const b = buenas[0];
+                sug.className = 'cal-sug bien';
+                sug.innerHTML = `Mejor separación: <b>métrica ${b.m.id}</b> (margen ${(b.margen * 100).toFixed(0)}%). ` +
+                    `Pon METRICA_FILTRO = '${b.m.id}' y su umbral en <b>${b.sugerido.toFixed(1)}</b>.`;
+            } else {
+                sug.className = 'cal-sug mal';
+                sug.innerHTML = 'En ninguna métrica se separan físico y pantalla con estas condiciones (se solapan). ' +
+                    'Prueba otra luz, distancia o brillo del celular, y vuelve a medir.';
+            }
+        }
+
+        function calTexto() {
+            return CAL_METRICAS.map(calAnalisis).map(r => {
+                const l = (n, s) => `  ${n}: n=${s.n} min=${calFmt(s.min)} p5=${calFmt(s.p5)} mediana=${calFmt(s.med)} ` +
+                    `p95=${calFmt(s.p95)} max=${calFmt(s.max)} mal=${s.pctMal === null ? '—' : s.pctMal.toFixed(0) + '%'}`;
+                return `Métrica ${r.m.id} (umbral ${r.m.umbral()})\n${l('FISICO', r.f)}\n${l('PANTALLA', r.p)}` +
+                    (r.margen !== null ? `\n  margen=${(r.margen * 100).toFixed(0)}% sugerido=${r.sugerido.toFixed(1)}` : '');
+            }).join('\n');
+        }
+
+        function calCopiar() {
+            const t = calTexto();
+            (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject())
+                .then(() => alert('Resultados copiados'))
+                .catch(() => prompt('Copia estos resultados:', t));
+        }
+
+        function calLimpiar() {
+            calMuestras.fisico = []; calMuestras.pantalla = [];
+            calRender();
+        }
+
+        if (MODO_CALIBRACION) {
+            document.getElementById('cal-wrap').style.display = 'block';
+            calRender();
+        }
+
+        
         function iniciarEscaner() {
             html5QrCode = new Html5Qrcode("reader");
 
-            // Confirmación de 2 lecturas seguidas del MISMO código antes de
-            // rechazar por pantalla. Con el margen angosto que salió en las
-            // pruebas reales (carnet físico llegó hasta 13.17, celular bajó
-            // hasta 15.64 con umbral en 14.5), una sola foto ruidosa podía
-            // tumbar el carnet real. Exigir 2 lecturas seguidas por encima
-            // del umbral reduce mucho ese riesgo, porque el celular sale
-            // alto de forma consistente (5 de 5 en las pruebas) mientras que
-            // el físico solo se salió una vez de cinco.
-            let ultimoCodigoSospechoso = null;
-            let conteoSospechoso = 0;
+            // Buffer de lecturas del mismo código para decidir con la mediana.
+            let bufferCodigo = null;
+            let bufferMedidas = [];
+            let bufferUltimaHora = 0;
+            const LECTURAS_PARA_DECIDIR = 3;   // ~0.3 s a 10 fps
+            const VENTANA_MAX_MS = 1500;       // si pasa más tiempo, se empieza de nuevo
 
             Html5Qrcode.getCameras().then(dispositivos => {
                 if (dispositivos && dispositivos.length > 0) {
@@ -496,60 +712,69 @@
                         dispositivos[0].id,
                         { fps: 10, qrbox: 240 },
                         (codigo) => {
+                            // Modo calibración: solo mide y muestra; nunca registra.
+                            if (MODO_CALIBRACION) {
+                                const videoCal = document.querySelector('#reader video');
+                                const med = videoCal ? analizarCalidadImagen(videoCal) : null;
+                                if (med) calMuestra(med);
+                                return;
+                            }
+
                             if (!scannerActivo) return;
 
                             if (FILTRO_CALIDAD_ACTIVO) {
                                 const video = document.querySelector('#reader video');
-                                const analisis = video ? analizarCalidadImagen(video) : { pantalla: false };
+                                const analisis = video ? analizarCalidadImagen(video) : null;
 
-                                if (analisis.pantalla) {
-                                    if (ultimoCodigoSospechoso === codigo) {
-                                        conteoSospechoso++;
-                                    } else {
-                                        ultimoCodigoSospechoso = codigo;
-                                        conteoSospechoso = 1;
+                                // Si el análisis falla o no hay datos, no se bloquea el registro.
+                                if (analisis && typeof analisis.valor === 'number') {
+                                    const ahora = Date.now();
+                                    if (codigo !== bufferCodigo || ahora - bufferUltimaHora > VENTANA_MAX_MS) {
+                                        bufferCodigo = codigo;
+                                        bufferMedidas = [];
                                     }
-                                } else {
-                                    ultimoCodigoSospechoso = null;
-                                    conteoSospechoso = 0;
-                                }
+                                    bufferUltimaHora = ahora;
+                                    bufferMedidas.push(analisis.valor);
 
-                                if (FILTRO_CALIDAD_DEBUG) {
-                                    console.log(`[Filtro de calidad] confirmaciones seguidas: ${conteoSospechoso}/2`);
-                                }
+                                    // Se espera a juntar varias lecturas del MISMO código y se
+                                    // decide con la mediana: una foto ruidosa suelta ya no puede
+                                    // tumbar al carnet real, ni dejar pasar una pantalla.
+                                    if (bufferMedidas.length < LECTURAS_PARA_DECIDIR) return;
 
-                                if (conteoSospechoso >= 2) {
-                                    ultimoCodigoSospechoso = null;
-                                    conteoSospechoso = 0;
-                                    scannerActivo = false;
-                                    mostrarMensaje(
-                                        'Código rechazado: parece estar mostrado desde una pantalla. Usa el carnet físico.',
-                                        'error', 'fa-mobile-alt'
-                                    );
-                                    agregarLog('Rechazado — QR mostrado desde una pantalla', 'error');
+                                    const mediana = calPercentil(bufferMedidas, 0.5);
+                                    bufferCodigo = null;
+                                    bufferMedidas = [];
 
-                                    // Deja registro en la auditoría (tabla intentos_asistencia),
-                                    // aunque este intento nunca llegue a /registrar-asistencia.
-                                    fetch('{{ url("/registrar-intento-sospechoso") }}', {
-                                        method: 'POST',
-                                        headers: {
-                                            'Content-Type': 'application/json',
-                                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
-                                        },
-                                        body: JSON.stringify({ codigo: codigo })
-                                    }).catch(() => {}); // si falla el registro de auditoría, no interrumpir al usuario
+                                    if (FILTRO_CALIDAD_DEBUG) {
+                                        console.log(`[Filtro de calidad] mediana de ${LECTURAS_PARA_DECIDIR} lecturas = ` +
+                                            `${mediana.toFixed(2)} (umbral ${analisis.umbral})`);
+                                    }
 
-                                    setTimeout(() => {
-                                        scannerActivo = true;
-                                        mostrarMensaje('Esperando escaneo...', 'waiting', 'fa-search');
-                                    }, 2000);
-                                    return;
-                                }
+                                    if (mediana > analisis.umbral) {
+                                        scannerActivo = false;
+                                        mostrarMensaje(
+                                            'Código rechazado: parece estar mostrado desde una pantalla. Usa el carnet físico.',
+                                            'error', 'fa-mobile-alt'
+                                        );
+                                        agregarLog('Rechazado — QR mostrado desde una pantalla', 'error');
 
-                                // Primera lectura sospechosa: esperar la siguiente lectura
-                                // del mismo código antes de decidir — no registrar todavía.
-                                if (analisis.pantalla) {
-                                    return;
+                                        // Deja registro en la auditoría (tabla intentos_asistencia),
+                                        // aunque este intento nunca llegue a /registrar-asistencia.
+                                        fetch('{{ url("/registrar-intento-sospechoso") }}', {
+                                            method: 'POST',
+                                            headers: {
+                                                'Content-Type': 'application/json',
+                                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+                                            },
+                                            body: JSON.stringify({ codigo: codigo })
+                                        }).catch(() => {}); // si falla la auditoría, no interrumpir al usuario
+
+                                        setTimeout(() => {
+                                            scannerActivo = true;
+                                            mostrarMensaje('Esperando escaneo...', 'waiting', 'fa-search');
+                                        }, 2000);
+                                        return;
+                                    }
                                 }
                             }
 

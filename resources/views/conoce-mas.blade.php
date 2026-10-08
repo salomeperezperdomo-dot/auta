@@ -66,23 +66,22 @@
           ></i
           >Conoce más sobre AUTA
         </h2>
-        <p class="sec-sub">Video, datos, un pequeño juego y el manual de usuario</p>
+        <p class="sec-sub">Datos, un pequeño juego, un quiz y el manual de usuario</p>
 
         <div class="cards-grid">
-          <!-- 1. Video de YouTube (demo de AUTA) -->
+          <!-- 1. Quiz: "¿Cuánto sabes de AUTA?" -->
           <div class="info-card">
-            <div class="card-ico ico-bl"><i class="fas fa-video"></i></div>
-            <h4>Video demostrativo</h4>
-            <p>Un recorrido en video por el funcionamiento real del sistema.</p>
-            {{-- Reemplazar VIDEO_ID_AQUI por el ID del video de YouTube una vez grabado y subido --}}
+            <div class="card-ico ico-bl"><i class="fas fa-question-circle"></i></div>
+            <h4>Quiz: ¿Cuánto sabes de AUTA?</h4>
+            <p>Seis preguntas rápidas para comprobar lo que aprendiste del proyecto.</p>
             <a
-              href="https://www.youtube.com/watch?v=VIDEO_ID_AQUI"
+              href="{{ asset('juegos/quiz-auta.html') }}"
               target="_blank"
               rel="noopener"
               class="btn-prim"
               style="display: inline-block; margin-top: 0.8rem; text-decoration: none;"
             >
-              <i class="fas fa-external-link-alt"></i> Ver video
+              <i class="fas fa-external-link-alt"></i> Hacer el quiz
             </a>
           </div>
 

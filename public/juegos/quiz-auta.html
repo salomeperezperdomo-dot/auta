@@ -1,0 +1,302 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Quiz · ¿Cuánto sabes de AUTA?</title>
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0b1b33;
+      --card: rgba(255, 255, 255, 0.05);
+      --border: rgba(255, 255, 255, 0.12);
+      --text: #e5edf7;
+      --muted: #9aa5b1;
+      --blue: #2563eb;
+      --blue-light: #60a5fa;
+      --ok: #10b981;
+      --bad: #f87171;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: radial-gradient(circle at 20% 0%, #12305a 0%, var(--bg) 55%);
+      color: var(--text);
+      font-family: "DM Sans", Calibri, Arial, sans-serif;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 1.5rem 1rem 3rem;
+    }
+    .quiz { width: 100%; max-width: 640px; }
+    .top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem; }
+    .logo { font-family: "Sora", sans-serif; font-weight: 800; font-size: 1.3rem; color: #fff; }
+    .top a { color: var(--muted); text-decoration: none; font-weight: 600; font-size: 0.9rem; }
+    .top a:hover { color: #fff; }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 1.5rem;
+    }
+    h1 { font-family: "Sora", sans-serif; font-size: 1.35rem; margin: 0 0 0.25rem; color: #fff; }
+    .sub { color: var(--muted); margin: 0 0 1.25rem; font-size: 0.92rem; }
+    .progress-row { display: flex; justify-content: space-between; font-size: 0.8rem; color: var(--muted); margin-bottom: 0.4rem; }
+    .bar { height: 6px; border-radius: 6px; background: rgba(255,255,255,0.1); overflow: hidden; margin-bottom: 1.25rem; }
+    .bar > div { height: 100%; width: 0; background: linear-gradient(90deg, var(--blue), var(--blue-light)); transition: width 0.35s ease; }
+    .pregunta { font-family: "Sora", sans-serif; font-weight: 600; font-size: 1.08rem; line-height: 1.4; margin: 0 0 1rem; color: #fff; }
+    .opciones { display: flex; flex-direction: column; gap: 0.6rem; }
+    .op {
+      text-align: left;
+      width: 100%;
+      padding: 0.85rem 1rem;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,0.04);
+      color: var(--text);
+      font: inherit;
+      font-size: 0.95rem;
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s, transform 0.1s;
+    }
+    .op:hover:not(:disabled) { border-color: var(--blue-light); background: rgba(37, 99, 235, 0.15); }
+    .op:active:not(:disabled) { transform: scale(0.99); }
+    .op:disabled { cursor: default; }
+    .op.ok { border-color: var(--ok); background: rgba(16, 185, 129, 0.16); color: #d1fae5; }
+    .op.bad { border-color: var(--bad); background: rgba(239, 68, 68, 0.14); color: #fecaca; }
+    .op.dim { opacity: 0.5; }
+    .feedback {
+      margin-top: 1rem;
+      padding: 0.85rem 1rem;
+      border-radius: 12px;
+      font-size: 0.9rem;
+      line-height: 1.5;
+      display: none;
+    }
+    .feedback.show { display: block; }
+    .feedback.ok { background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.35); }
+    .feedback.bad { background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); }
+    .feedback b { color: #fff; }
+    .btn {
+      display: inline-block;
+      margin-top: 1rem;
+      padding: 0.7rem 1.4rem;
+      border-radius: 12px;
+      border: none;
+      background: var(--blue);
+      color: #fff;
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+      text-decoration: none;
+    }
+    .btn:hover { background: #1d4ed8; }
+    .btn.sec { background: transparent; border: 1px solid var(--border); color: var(--muted); margin-left: 0.5rem; }
+    .btn.sec:hover { color: #fff; border-color: rgba(255,255,255,0.3); background: transparent; }
+    .final { text-align: center; padding: 0.5rem 0; }
+    .score { font-family: "Sora", sans-serif; font-weight: 800; font-size: 3.2rem; color: #fff; line-height: 1; }
+    .score small { font-size: 1.2rem; color: var(--muted); font-weight: 600; }
+    .final h2 { font-family: "Sora", sans-serif; margin: 0.8rem 0 0.3rem; font-size: 1.25rem; color: var(--blue-light); }
+    .final p { color: var(--muted); margin: 0 0 0.5rem; }
+    .hidden { display: none; }
+    @media (max-width: 480px) {
+      .card { padding: 1.1rem; }
+      .btn.sec { margin-left: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="quiz">
+    <div class="top">
+      <span class="logo">AUTA</span>
+      <a href="/conoce-mas">&larr; Volver a Conoce más</a>
+    </div>
+
+    <div class="card">
+      <h1>¿Cuánto sabes de AUTA?</h1>
+      <p class="sub">6 preguntas rápidas sobre el proyecto. Después de cada respuesta verás la explicación.</p>
+
+      <div id="juego">
+        <div class="progress-row"><span id="contador">Pregunta 1 de 6</span><span id="puntos">Aciertos: 0</span></div>
+        <div class="bar"><div id="barra"></div></div>
+        <p class="pregunta" id="pregunta"></p>
+        <div class="opciones" id="opciones"></div>
+        <div class="feedback" id="feedback" role="status" aria-live="polite"></div>
+        <button class="btn hidden" id="siguiente" type="button"></button>
+      </div>
+
+      <div id="final" class="final hidden">
+        <div class="score"><span id="score-n">0</span><small> / 6</small></div>
+        <h2 id="final-titulo"></h2>
+        <p id="final-texto"></p>
+        <button class="btn" id="reintentar" type="button">Intentar de nuevo</button>
+        <a class="btn sec" href="/conoce-mas">Volver a Conoce más</a>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const PREGUNTAS = [
+      {
+        texto: "Según el estudio del Banco Mundial, ¿qué porcentaje del tiempo de clase se usa realmente para enseñar en Colombia?",
+        opciones: ["Cerca del 35 %", "Cerca del 65 %", "Cerca del 85 %", "Casi el 100 %"],
+        correcta: 1,
+        explicacion: "Solo alrededor del 65 % del tiempo de clase se dedica a enseñar. El resto se pierde en tareas como pasar lista, y por eso nació AUTA."
+      },
+      {
+        texto: "¿Cómo registra la asistencia AUTA?",
+        opciones: [
+          "El docente escribe cada nombre en una planilla",
+          "Se escanea con la cámara el código QR del carnet del estudiante",
+          "El estudiante firma una hoja al entrar",
+          "Se llama a lista en voz alta y el sistema la transcribe"
+        ],
+        correcta: 1,
+        explicacion: "Cada estudiante tiene un carnet con código QR. Al escanearlo, la asistencia queda registrada automáticamente en pocos segundos."
+      },
+      {
+        texto: "¿Qué hace el filtro de calidad del escáner?",
+        opciones: [
+          "Mejora el brillo de la cámara",
+          "Detecta si el QR se muestra desde una pantalla en vez del carnet físico",
+          "Cuenta cuántos estudiantes hay en el salón",
+          "Guarda una foto de cada estudiante"
+        ],
+        correcta: 1,
+        explicacion: "El filtro analiza la imagen para distinguir un carnet impreso de un QR mostrado en un celular o computador, así se evita que un estudiante registre a otro con una foto."
+      },
+      {
+        texto: "¿Para qué sirve la tabla «intentos_asistencia»?",
+        opciones: [
+          "Para guardar las notas de los estudiantes",
+          "Para guardar los horarios de cada grupo",
+          "Para auditar los intentos fallidos: duplicados, carnets no encontrados y QR mostrados desde pantalla",
+          "Para almacenar las contraseñas"
+        ],
+        correcta: 2,
+        explicacion: "Cada intento que no termina en una asistencia válida queda registrado, así se puede revisar qué pasó y por qué."
+      },
+      {
+        texto: "¿Qué tres tipos de usuario contempla AUTA?",
+        opciones: [
+          "Rector, padre de familia y visitante",
+          "Administrador, docente y estudiante",
+          "Coordinador, portero y estudiante",
+          "Solo administrador y docente"
+        ],
+        correcta: 1,
+        explicacion: "El manual de usuario explica cómo usar el sistema según el rol: administrador, docente o estudiante."
+      },
+      {
+        texto: "Según el MEN y el SIMAT, ¿aproximadamente cuántas sedes educativas hay en Colombia donde AUTA podría replicarse?",
+        opciones: ["Unas 500", "Unas 5.000", "Unas 53.000", "Más de 500.000"],
+        correcta: 2,
+        explicacion: "Hay cerca de 53.000 sedes educativas en el país. Por eso AUTA se plantea como una solución replicable, no solo para un colegio."
+      }
+    ];
+
+    const TOTAL = PREGUNTAS.length;
+    let indice = 0, aciertos = 0, respondida = false, actuales = [];
+
+    const el = id => document.getElementById(id);
+
+    function barajar(arr) {
+      const a = arr.slice();
+      for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+      }
+      return a;
+    }
+
+    function mostrarPregunta() {
+      const p = PREGUNTAS[indice];
+      respondida = false;
+      el("contador").textContent = "Pregunta " + (indice + 1) + " de " + TOTAL;
+      el("puntos").textContent = "Aciertos: " + aciertos;
+      el("barra").style.width = (indice / TOTAL * 100) + "%";
+      el("pregunta").textContent = p.texto;
+      el("feedback").className = "feedback";
+      el("feedback").innerHTML = "";
+      el("siguiente").classList.add("hidden");
+
+      actuales = barajar(p.opciones.map((t, i) => ({ texto: t, ok: i === p.correcta })));
+      const cont = el("opciones");
+      cont.innerHTML = "";
+      actuales.forEach((o, i) => {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "op";
+        b.textContent = o.texto;
+        b.addEventListener("click", () => responder(i));
+        cont.appendChild(b);
+      });
+    }
+
+    function responder(i) {
+      if (respondida) return;
+      respondida = true;
+      const p = PREGUNTAS[indice];
+      const botones = el("opciones").children;
+      const acerto = actuales[i].ok;
+      if (acerto) aciertos++;
+
+      for (let k = 0; k < botones.length; k++) {
+        botones[k].disabled = true;
+        if (actuales[k].ok) botones[k].classList.add("ok");
+        else if (k === i) botones[k].classList.add("bad");
+        else botones[k].classList.add("dim");
+      }
+
+      const fb = el("feedback");
+      fb.className = "feedback show " + (acerto ? "ok" : "bad");
+      fb.innerHTML = "<b>" + (acerto ? "¡Correcto!" : "No exactamente.") + "</b> " + p.explicacion;
+      el("puntos").textContent = "Aciertos: " + aciertos;
+
+      const sig = el("siguiente");
+      sig.textContent = indice === TOTAL - 1 ? "Ver resultado" : "Siguiente";
+      sig.classList.remove("hidden");
+      sig.focus();
+    }
+
+    function mostrarFinal() {
+      el("barra").style.width = "100%";
+      el("juego").classList.add("hidden");
+      el("final").classList.remove("hidden");
+      el("score-n").textContent = aciertos;
+      let titulo, texto;
+      if (aciertos === TOTAL) {
+        titulo = "¡Experto en AUTA!";
+        texto = "Respondiste todo bien. Ya conoces el problema y cómo lo resuelve el proyecto.";
+      } else if (aciertos >= 4) {
+        titulo = "¡Muy bien!";
+        texto = "Conoces lo esencial de AUTA. Revisa la infografía para repasar el resto.";
+      } else if (aciertos >= 2) {
+        titulo = "Vas por buen camino";
+        texto = "Mira la infografía y el manual en «Conoce más» y vuelve a intentarlo.";
+      } else {
+        titulo = "Échale otro vistazo";
+        texto = "Revisa la infografía y el manual en «Conoce más» y prueba de nuevo.";
+      }
+      el("final-titulo").textContent = titulo;
+      el("final-texto").textContent = texto;
+    }
+
+    el("siguiente").addEventListener("click", () => {
+      if (indice === TOTAL - 1) { mostrarFinal(); return; }
+      indice++;
+      mostrarPregunta();
+    });
+
+    el("reintentar").addEventListener("click", () => {
+      indice = 0; aciertos = 0;
+      el("final").classList.add("hidden");
+      el("juego").classList.remove("hidden");
+      mostrarPregunta();
+    });
+
+    mostrarPregunta();
+  </script>
+</body>
+</html>

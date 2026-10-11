@@ -444,6 +444,10 @@
         const PARAMS_URL = new URLSearchParams(window.location.search);
         const MODO_CALIBRACION = PARAMS_URL.get('calibrar') === '1';
         const FILTRO_CALIDAD_DEBUG = MODO_CALIBRACION || PARAMS_URL.get('debug') === '1';
+        // Esta línea sale SIEMPRE al cargar la página: si no la ves en la consola,
+        // el navegador está mostrando una versión vieja del archivo.
+        console.log('[AUTA escáner] v3 · debug ' +
+            (FILTRO_CALIDAD_DEBUG ? 'ACTIVO' : 'apagado (agrega ?debug=1 al final de la URL)'));
 
         // Umbrales de partida — NO están garantizados para su cámara/carnet
         // específicos. Hay que calibrarlos así: activar FILTRO_CALIDAD_DEBUG,
@@ -493,7 +497,10 @@
             try {
                 const size = 240; // igual al qrbox configurado abajo
                 const vw = video.videoWidth, vh = video.videoHeight;
-                if (!vw || !vh) return { pantalla: false, motivo: 'sin datos de video' };
+                if (!vw || !vh) {
+                    if (FILTRO_CALIDAD_DEBUG) console.warn('[Filtro de calidad] el video aún no tiene datos, no se pudo medir');
+                    return { pantalla: false, motivo: 'sin datos de video' };
+                }
 
                 const cw = Math.min(size, vw), ch = Math.min(size, vh);
                 const sx = Math.floor((vw - cw) / 2), sy = Math.floor((vh - ch) / 2);
@@ -712,6 +719,8 @@
                         dispositivos[0].id,
                         { fps: 10, qrbox: 240 },
                         (codigo) => {
+                            if (FILTRO_CALIDAD_DEBUG) console.log('[AUTA escáner] QR leído por la cámara');
+
                             // Modo calibración: solo mide y muestra; nunca registra.
                             if (MODO_CALIBRACION) {
                                 const videoCal = document.querySelector('#reader video');

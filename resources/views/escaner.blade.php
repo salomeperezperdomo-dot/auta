@@ -432,7 +432,14 @@
         // Activa/desactiva el filtro fácilmente. Si durante los ensayos
         // el carnet físico real se llega a rechazar por error, poner
         // esto en false mientras se recalibran los umbrales de abajo.
-        const FILTRO_CALIDAD_ACTIVO = true;
+        //
+        // ESTADO ACTUAL: false. Con el carnet plastificado (forro + escarapela)
+        // el valor de color del carnet físico oscila entre ~10 y ~46 según el
+        // ángulo y el reflejo, el mismo rango que alcanza una pantalla, así que
+        // ningún umbral separa los dos casos de forma confiable. Con carnet
+        // sin plastificar sí separaba (físico <= 13.17, pantalla >= 15.64).
+        // Para reactivarlo: poner true (y recalibrar con ?calibrar=1).
+        const FILTRO_CALIDAD_ACTIVO = false;
 
         // Poner en true mientras se calibra: muestra en la consola del
         // navegador (F12 → Console) los valores medidos en cada intento,

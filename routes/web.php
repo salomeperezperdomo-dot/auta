@@ -29,7 +29,6 @@ Route::middleware('auth')->group(function () {
 
     // Lectura: admin, docente y estudiante pueden consultar
     Route::get('/api/asistencia', [AsistenciaController::class, 'index']);
-    Route::get('/api/estudiantes', [EstudianteController::class, 'index']);
     Route::get('/grados', [GradoController::class, 'index']);
     Route::get('/grados/{grado}', [GradoController::class, 'show']);
     Route::get('/grupos', [GrupoController::class, 'index']);
@@ -56,6 +55,11 @@ Route::middleware('auth')->group(function () {
         Route::post('/api/asistencia', [AsistenciaController::class, 'store']);
         Route::put('/api/asistencia/{id}', [AsistenciaController::class, 'update']);
         Route::delete('/api/asistencia/{id}', [AsistenciaController::class, 'destroy']);
+
+        // Lista de estudiantes (incluye el código del carnet): solo admin.
+        // Antes estaba en el grupo de lectura de cualquier rol, y un
+        // estudiante con sesión podía pedirla y ver el código de todos.
+        Route::get('/api/estudiantes', [EstudianteController::class, 'index']);
 
         // Escritura de estudiantes
         Route::post('/api/estudiantes', [EstudianteController::class, 'store']);

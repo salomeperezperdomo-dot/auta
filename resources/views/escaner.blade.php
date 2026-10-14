@@ -433,21 +433,10 @@
         // el carnet físico real se llega a rechazar por error, poner
         // esto en false mientras se recalibran los umbrales de abajo.
         //
-        // ESTADO ACTUAL: false. Con el carnet plastificado (forro + escarapela)
-        // el valor de color del carnet físico oscila entre ~10 y ~46 según el
-        // ángulo y el reflejo, el mismo rango que alcanza una pantalla, así que
-        // ningún umbral separa los dos casos de forma confiable. Con carnet
-        // sin plastificar sí separaba (físico <= 13.17, pantalla >= 15.64).
-        // Para reactivarlo: poner true (y recalibrar con ?calibrar=1).
+        // ESTADO ACTUAL: false.
         const FILTRO_CALIDAD_ACTIVO = false;
 
-        // Poner en true mientras se calibra: muestra en la consola del
-        // navegador (F12 → Console) los valores medidos en cada intento,
-        // para poder ajustar los umbrales con el carnet y un celular reales.
-        // Se activa solo desde la URL, para no dejarlo prendido en la demo:
-        //   /escaner?debug=1     -> imprime los valores en la consola
-        //   /escaner?calibrar=1  -> panel de calibración en pantalla; en este
-        //                           modo NO se registra asistencia ni auditoría.
+        
         const PARAMS_URL = new URLSearchParams(window.location.search);
         const MODO_CALIBRACION = PARAMS_URL.get('calibrar') === '1';
         const FILTRO_CALIDAD_DEBUG = MODO_CALIBRACION || PARAMS_URL.get('debug') === '1';
@@ -456,23 +445,6 @@
         console.log('[AUTA escáner] v3 · debug ' +
             (FILTRO_CALIDAD_DEBUG ? 'ACTIVO' : 'apagado (agrega ?debug=1 al final de la URL)'));
 
-        // Umbrales de partida — NO están garantizados para su cámara/carnet
-        // específicos. Hay que calibrarlos así: activar FILTRO_CALIDAD_DEBUG,
-        // escanear el carnet físico varias veces y anotar los valores de
-        // varianzaLap y difColorProm que salen en consola; luego escanear el
-        // mismo QR mostrado en la pantalla de un celular y anotar esos valores.
-        // Los umbrales deben quedar en un punto intermedio que nunca rechace
-        // el carnet físico real, pero sí distinga la pantalla.
-        //
-        // Calibrado 2026-09-08 con 5+5 pruebas reales del equipo, mismas
-        // condiciones de mesa/luz:
-        //   - Carnet físico: 4.63, 7.69, 5.82, 5.74, 13.17
-        //   - Celular/pantalla: 15.64, 16.92, 17.70, 17.79, 33.22
-        // Hay separación, pero el margen es angosto (solo ~2.5 entre el
-        // físico más alto y el celular más bajo) — por eso el umbral solo
-        // no basta. Se agregó además una confirmación de 2 lecturas
-        // seguidas antes de rechazar (ver más abajo), para que una sola
-        // foto ruidosa del carnet real no lo tumbe.
         const UMBRAL_VARIANZA_LAPLACIANA = 4000;
         const UMBRAL_DIFERENCIA_COLOR = 14.5;
         // Métrica B (croma residual, compensa el tinte de la luz). Su umbral es
